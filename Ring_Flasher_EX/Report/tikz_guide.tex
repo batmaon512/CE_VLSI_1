@@ -1,0 +1,35 @@
+% filepath: test.tex
+\documentclass{article}
+
+% THÊM CÁC DÒNG NÀY ĐỂ HỖ TRỢ TIẾNG VIỆT
+\usepackage[utf8]{inputenc}
+\usepackage[T5,T1]{fontenc}
+\usepackage[vietnamese]{babel}
+% KẾT THÚC PHẦN THÊM
+
+% 1. Khai báo các package cần thiết
+\usepackage{tikz}
+\usepackage{circuitikz}
+
+\begin{document}
+
+\section{Kiểm tra TikZ cơ bản}
+
+Đây là một hình chữ nhật được vẽ bằng TikZ. Nếu bạn thấy nó, TikZ đã hoạt động.
+
+\begin{tikzpicture}
+    \draw[blue, thick, fill=blue!20] (0,0) rectangle (3,1);
+    \node at (1.5, 0.5) {TikZ OK};
+\end{tikzpicture}
+
+\vspace{1cm}
+
+\section{Kiểm tra CircuitikZ với LED}
+
+Đây là một mạch điện đơn giản với LED. Nếu bạn thấy ký hiệu LED, CircuitikZ đã hoạt động.
+
+\begin{circuitikz}
+    \draw (0,0) to[R, l=R1] (2,0) to[LED, l=D1] (4,0);
+\end{circuitikz}
+
+\end{document}
