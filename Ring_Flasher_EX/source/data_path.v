@@ -131,7 +131,6 @@ module Control#(
     
     assign cur = cur_pos;
     
-    // Chô này cần check lại xem còn cách nào hay hơn không
     always @(posedge clk) begin
         if ((rep == 0) && (State == IDLE_STATE)) begin
             ena_div <= 0;
