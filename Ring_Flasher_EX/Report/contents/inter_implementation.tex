@@ -58,4 +58,45 @@ Global Signals     & Clk & Input & 1-bit & Synchronous clock for all internal re
 
 \subsection{State machine}
 
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=1\linewidth]{graphics/FSM_lab1.pdf}
+	\caption{Finite state machine of the Ring Flasher module.}
+	\label{fig:fsm_ring_flasher}
+\end{figure}
+
+\noindent\textbf{Parameters}
+The finite state machine is implemented in the \texttt{Control} module with the following parameters:
+\begin{itemize}
+	\item \texttt{NumLed = 16}: number of LEDs in the ring.
+	\item \texttt{NumCW = 12}: number of clockwise (CW) steps.
+	\item \texttt{NumACW = 8}: number of anti-clockwise (ACW) steps.
+	\item \texttt{IDLE\_STATE = 0}: idle state.
+	\item \texttt{CW\_STATE = 1}: clockwise motion state.
+	\item \texttt{ACW\_STATE = 2}: anti-clockwise motion state.
+	\item \texttt{OFF\_STATE = 3}: turn-off state until all LEDs fade out.
+\end{itemize}
+
+\noindent\textbf{Variables}
+\begin{itemize}
+	\item Inputs: \texttt{clk}, \texttt{divclk}, \texttt{rep}, \texttt{rst}, \texttt{off\_all}.
+	\item Outputs: \texttt{cur}, \texttt{ena\_div}, \texttt{n\_rst\_div}.
+	\item State registers: \texttt{State}, \texttt{NextState}.
+	\item Counters: \texttt{Counter}, \texttt{NextCounter}.
+	\item LED position registers: \texttt{cur\_pos}, \texttt{next\_pos}.
+\end{itemize}
+
+The signal \texttt{cur} provides the current LED index to the datapath. The control outputs \texttt{ena\_div} and \texttt{n\_rst\_div} are used to enable and reset the step-timer clock divider.
+
+\noindent\textbf{State-by-State Behavior}
+\begin{itemize}
+	\item \textbf{IDLE\_STATE}: The system waits for \texttt{rep = 1}. If \texttt{rep = 0}, the divider is disabled and held in reset. When \texttt{rep = 1}, the FSM moves to \texttt{CW\_STATE}, initializes \texttt{Counter = 0}, and starts from position \texttt{0}.
+
+	\item \textbf{CW\_STATE}: At each \texttt{divclk} tick, the position moves clockwise and \texttt{Counter} is incremented. When \texttt{Counter = NumCW - 1}, the FSM transitions to \texttt{ACW\_STATE}.
+
+	\item \textbf{ACW\_STATE}: At each \texttt{divclk} tick, the position moves anti-clockwise and \texttt{Counter} is incremented. When \texttt{Counter = NumCW + NumACW - 1}, the FSM checks \texttt{rep}: if \texttt{rep = 1}, it returns to \texttt{CW\_STATE} with \texttt{Counter = 0}; otherwise, it enters \texttt{OFF\_STATE}.
+
+	\item \textbf{OFF\_STATE}: No new LED position is injected (position is forced to an invalid index). The datapath keeps decreasing LED intensity until all LEDs are off. When \texttt{off\_all = 1}, the FSM returns to \texttt{IDLE\_STATE}.
+\end{itemize}
+
 

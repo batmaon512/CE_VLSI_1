@@ -1,12 +1,12 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.28 (TeX Live 2025) (preloaded format=pdflatex 2025.8.2)  26 SEP 2025 22:38
+This is pdfTeX, Version 3.141592653-2.6-1.40.28 (TeX Live 2025) (preloaded format=pdflatex 2025.7.25)  11 APR 2026 22:51
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
  %&-line parsing enabled.
-**c:/Users/chith/Downloads/Study/HK251/DA_TKLL/Report/main.tex
-(c:/Users/chith/Downloads/Study/HK251/DA_TKLL/Report/main.tex
+**c:/Users/taiko/HCMUT/K252/CO3097_VLSI/LAB/CE_VLSI_1/Ring_Flasher_EX/Report/main.tex
+(c:/Users/taiko/HCMUT/K252/CO3097_VLSI/LAB/CE_VLSI_1/Ring_Flasher_EX/Report/main.tex
 LaTeX2e <2025-06-01> patch level 1
-L3 programming layer <2025-07-20>
+L3 programming layer <2025-07-19>
 (./hcmut_report.cls
 Document Class: hcmut_report 
 (c:/texlive/2025/texmf-dist/tex/latex/base/article.cls
@@ -942,7 +942,22 @@ File: pgflibrarycurvilinear.code.tex 2023-01-15 v3.1.10 (3.1.10)
 \pgf@circ@res@count=\count358
 ) (c:/texlive/2025/texmf-dist/tex/generic/circuitikz/pgfcircquadpoles.tex) (c:/texlive/2025/texmf-dist/tex/generic/circuitikz/pgfcircmultipoles.tex) (c:/texlive/2025/texmf-dist/tex/generic/circuitikz/pgfcirclabel.tex) (c:/texlive/2025/texmf-dist/tex/generic/circuitikz/pgfcircvoltage.tex
 \pgfcirc@labelshift=\dimen329
-) (c:/texlive/2025/texmf-dist/tex/generic/circuitikz/pgfcirccurrent.tex) (c:/texlive/2025/texmf-dist/tex/generic/circuitikz/pgfcircflow.tex)) (c:/texlive/2025/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibraryshapes.geometric.code.tex
+) (c:/texlive/2025/texmf-dist/tex/generic/circuitikz/pgfcirccurrent.tex) (c:/texlive/2025/texmf-dist/tex/generic/circuitikz/pgfcircflow.tex)) (c:/texlive/2025/texmf-dist/tex/latex/float/float.sty
+Package: float 2001/11/08 v1.3d Float enhancements (AL)
+\c@float@type=\count359
+\float@exts=\toks42
+\float@box=\box78
+\@float@everytoks=\toks43
+\@floatcapt=\box79
+) (c:/texlive/2025/texmf-dist/tex/latex/enumitem/enumitem.sty
+Package: enumitem 2025/02/06 v3.11 Customized lists
+\labelindent=\skip71
+\enit@outerparindent=\dimen330
+\enit@toks=\toks44
+\enit@inbox=\box80
+\enit@count@id=\count360
+\enitdp@description=\count361
+) (c:/texlive/2025/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibraryshapes.geometric.code.tex
 File: tikzlibraryshapes.geometric.code.tex 2023-01-15 v3.1.10 (3.1.10)
  (c:/texlive/2025/texmf-dist/tex/generic/pgf/libraries/shapes/pgflibraryshapes.geometric.code.tex
 File: pgflibraryshapes.geometric.code.tex 2023-01-15 v3.1.10 (3.1.10)
@@ -950,7 +965,7 @@ File: pgflibraryshapes.geometric.code.tex 2023-01-15 v3.1.10 (3.1.10)
 File: tikzlibraryarrows.code.tex 2023-01-15 v3.1.10 (3.1.10)
  (c:/texlive/2025/texmf-dist/tex/generic/pgf/libraries/pgflibraryarrows.code.tex
 File: pgflibraryarrows.code.tex 2023-01-15 v3.1.10 (3.1.10)
-\arrowsize=\dimen330
+\arrowsize=\dimen331
 )) (c:/texlive/2025/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibrarypositioning.code.tex
 File: tikzlibrarypositioning.code.tex 2023-01-15 v3.1.10 (3.1.10)
 ) (c:/texlive/2025/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibrarypatterns.code.tex
@@ -958,72 +973,78 @@ File: tikzlibrarypatterns.code.tex 2023-01-15 v3.1.10 (3.1.10)
  (c:/texlive/2025/texmf-dist/tex/generic/pgf/libraries/pgflibrarypatterns.code.tex
 File: pgflibrarypatterns.code.tex 2023-01-15 v3.1.10 (3.1.10)
 )) (c:/texlive/2025/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibrarydecorations.pathmorphing.code.tex (c:/texlive/2025/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibrarydecorations.code.tex (c:/texlive/2025/texmf-dist/tex/generic/pgf/modules/pgfmoduledecorations.code.tex
-\pgfdecoratedcompleteddistance=\dimen331
-\pgfdecoratedremainingdistance=\dimen332
-\pgfdecoratedinputsegmentcompleteddistance=\dimen333
-\pgfdecoratedinputsegmentremainingdistance=\dimen334
-\pgf@decorate@distancetomove=\dimen335
-\pgf@decorate@repeatstate=\count359
-\pgfdecorationsegmentamplitude=\dimen336
-\pgfdecorationsegmentlength=\dimen337
+\pgfdecoratedcompleteddistance=\dimen332
+\pgfdecoratedremainingdistance=\dimen333
+\pgfdecoratedinputsegmentcompleteddistance=\dimen334
+\pgfdecoratedinputsegmentremainingdistance=\dimen335
+\pgf@decorate@distancetomove=\dimen336
+\pgf@decorate@repeatstate=\count362
+\pgfdecorationsegmentamplitude=\dimen337
+\pgfdecorationsegmentlength=\dimen338
 )
-\tikz@lib@dec@box=\box78
+\tikz@lib@dec@box=\box81
 ) (c:/texlive/2025/texmf-dist/tex/generic/pgf/libraries/decorations/pgflibrarydecorations.pathmorphing.code.tex))
-LaTeX Font Info:    Trying to load font information for T5+ptm on input line 25.
+LaTeX Font Info:    Trying to load font information for T5+ptm on input line 28.
  (c:/texlive/2025/texmf-dist/tex/latex/vntex/t5ptm.fd
 File: t5utm.fd 2005/08/24 Fontinst v1.929 font definitions for T5/ptm.
 ) (c:/texlive/2025/texmf-dist/tex/latex/l3backend/l3backend-pdftex.def
 File: l3backend-pdftex.def 2025-06-09 L3 backend support: PDF output (pdfTeX)
-\l__color_backend_stack_int=\count360
-) (output/main.aux)
+\l__color_backend_stack_int=\count363
+) (output/main.aux
+Package babel Info: 'vietnamese' activates 'vietnamese' shorthands.
+(babel)             Reported on input line 9.
+ (output/contents/interface.aux
+
+LaTeX Warning: Label `tab:interface_ring_flasher' multiply defined.
+
+) (output/contents/FSM.aux) (output/contents/func_implementation.aux) (output/contents/inter_implementation.aux) (output/contents/simulation.aux))
 \openout1 = `main.aux'.
 
-LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 25.
-LaTeX Font Info:    ... okay on input line 25.
-LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 25.
-LaTeX Font Info:    ... okay on input line 25.
-LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 25.
-LaTeX Font Info:    ... okay on input line 25.
-LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 25.
-LaTeX Font Info:    ... okay on input line 25.
-LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 25.
-LaTeX Font Info:    ... okay on input line 25.
-LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 25.
-LaTeX Font Info:    ... okay on input line 25.
-LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 25.
-LaTeX Font Info:    ... okay on input line 25.
-LaTeX Font Info:    Checking defaults for T5/cmr/m/n on input line 25.
-LaTeX Font Info:    ... okay on input line 25.
-LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 25.
-LaTeX Font Info:    ... okay on input line 25.
-LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 25.
-LaTeX Font Info:    ... okay on input line 25.
-Package babel Info: 'vietnamese' activates 'vietnamese' shorthands.
-(babel)             Reported on input line 25.
-Package hyperref Info: Link coloring ON on input line 25.
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 28.
+LaTeX Font Info:    ... okay on input line 28.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 28.
+LaTeX Font Info:    ... okay on input line 28.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 28.
+LaTeX Font Info:    ... okay on input line 28.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 28.
+LaTeX Font Info:    ... okay on input line 28.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 28.
+LaTeX Font Info:    ... okay on input line 28.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 28.
+LaTeX Font Info:    ... okay on input line 28.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 28.
+LaTeX Font Info:    ... okay on input line 28.
+LaTeX Font Info:    Checking defaults for T5/cmr/m/n on input line 28.
+LaTeX Font Info:    ... okay on input line 28.
+LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 28.
+LaTeX Font Info:    ... okay on input line 28.
+LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 28.
+LaTeX Font Info:    ... okay on input line 28.
+Package hyperref Info: Link coloring ON on input line 28.
+ (output/main.out) (output/main.out)
 \@outlinefile=\write4
 \openout4 = `main.out'.
 
  (c:/texlive/2025/texmf-dist/tex/context/base/mkii/supp-pdf.mkii
 [Loading MPS to PDF converter (version 2006.09.02).]
-\scratchcounter=\count361
-\scratchdimen=\dimen338
-\scratchbox=\box79
-\nofMPsegments=\count362
-\nofMParguments=\count363
-\everyMPshowfont=\toks42
-\MPscratchCnt=\count364
-\MPscratchDim=\dimen339
-\MPnumerator=\count365
-\makeMPintoPDFobject=\count366
-\everyMPtoPDFconversion=\toks43
+\scratchcounter=\count364
+\scratchdimen=\dimen339
+\scratchbox=\box82
+\nofMPsegments=\count365
+\nofMParguments=\count366
+\everyMPshowfont=\toks45
+\MPscratchCnt=\count367
+\MPscratchDim=\dimen340
+\MPnumerator=\count368
+\makeMPintoPDFobject=\count369
+\everyMPtoPDFconversion=\toks46
 ) (c:/texlive/2025/texmf-dist/tex/latex/epstopdf-pkg/epstopdf-base.sty
 Package: epstopdf-base 2020-01-24 v2.11 Base part for package epstopdf
 Package epstopdf-base Info: Redefining graphics rule for `.eps' on input line 485.
  (c:/texlive/2025/texmf-dist/tex/latex/latexconfig/epstopdf-sys.cfg
 File: epstopdf-sys.cfg 2010/07/13 v1.3 Configuration of (r)epstopdf for TeX Live
 ))
-\c@lstlisting=\count367
+\c@lstlisting=\count370
 
 *geometry* driver: auto-detecting
 *geometry* detected driver: pdftex
@@ -1060,44 +1081,45 @@ File: epstopdf-sys.cfg 2010/07/13 v1.3 Configuration of (r)epstopdf for TeX Live
 * (1in=72.27pt=25.4mm, 1cm=28.453pt)
 
 Package caption Info: Begin \AtBeginDocument code.
+Package caption Info: float package is loaded.
 Package caption Info: End \AtBeginDocument code.
-<graphics/hcmut.png, id=7, 291.0072pt x 293.898pt>
+<graphics/hcmut.png, id=55, 291.0072pt x 293.898pt>
 File: graphics/hcmut.png Graphic file (type png)
 <use graphics/hcmut.png>
-Package pdftex.def Info: graphics/hcmut.png  used on input line 26.
+Package pdftex.def Info: graphics/hcmut.png  used on input line 29.
 (pdftex.def)             Requested size: 116.4008pt x 117.5571pt.
-LaTeX Font Info:    Trying to load font information for OT1+ztmcm on input line 26.
+LaTeX Font Info:    Trying to load font information for OT1+ztmcm on input line 29.
 (c:/texlive/2025/texmf-dist/tex/latex/psnfss/ot1ztmcm.fd
 File: ot1ztmcm.fd 2000/01/03 Fontinst v1.801 font definitions for OT1/ztmcm.
 )
-LaTeX Font Info:    Trying to load font information for OML+ztmcm on input line 26.
+LaTeX Font Info:    Trying to load font information for OML+ztmcm on input line 29.
  (c:/texlive/2025/texmf-dist/tex/latex/psnfss/omlztmcm.fd
 File: omlztmcm.fd 2000/01/03 Fontinst v1.801 font definitions for OML/ztmcm.
 )
-LaTeX Font Info:    Trying to load font information for OMS+ztmcm on input line 26.
+LaTeX Font Info:    Trying to load font information for OMS+ztmcm on input line 29.
  (c:/texlive/2025/texmf-dist/tex/latex/psnfss/omsztmcm.fd
 File: omsztmcm.fd 2000/01/03 Fontinst v1.801 font definitions for OMS/ztmcm.
 )
-LaTeX Font Info:    Trying to load font information for OMX+ztmcm on input line 26.
+LaTeX Font Info:    Trying to load font information for OMX+ztmcm on input line 29.
  (c:/texlive/2025/texmf-dist/tex/latex/psnfss/omxztmcm.fd
 File: omxztmcm.fd 2000/01/03 Fontinst v1.801 font definitions for OMX/ztmcm.
 )
-LaTeX Font Info:    Trying to load font information for OT1+ptm on input line 26.
+LaTeX Font Info:    Trying to load font information for OT1+ptm on input line 29.
  (c:/texlive/2025/texmf-dist/tex/latex/psnfss/ot1ptm.fd
 File: ot1ptm.fd 2001/06/04 font definitions for OT1/ptm.
 )
 LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <12> not available
-(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 26.
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 29.
 LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <9> not available
-(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 26.
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 29.
 LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <7> not available
-(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 26.
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 29.
 LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <24.88> not available
-(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 26.
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 29.
 LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <17.28> not available
-(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 26.
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 29.
 LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <14.4> not available
-(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 26.
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 29.
 
 
 [1
@@ -1107,114 +1129,214 @@ LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <14.4> not available
 [2
 
 
-]
-No file main.toc.
+] (output/main.toc)
 \tf@toc=\write5
 \openout5 = `main.toc'.
 
 
 
 [3]
+\openout2 = `contents/interface.aux'.
 
-c:/Users/chith/Downloads/Study/HK251/DA_TKLL/Report/main.tex:103: Package pgfkeys Error: I do not know the key '/tikz/LED' and I am going to ignore it. Perhaps you misspelled it.
+ (./contents/interface.tex
+<graphics/Interface_lab1.pdf, id=87, 361.35pt x 361.35pt>
+File: graphics/Interface_lab1.pdf Graphic file (type pdf)
+<use graphics/Interface_lab1.pdf>
+Package pdftex.def Info: graphics/Interface_lab1.pdf  used on input line 5.
+(pdftex.def)             Requested size: 483.69687pt x 483.69922pt.
+)
 
-See the pgfkeys package documentation for explanation.
-Type  H <return>  for immediate help.
- ...                                              
-                                                  
-l.103           to[LED, l=LED1] (2,0)
-                                     
-This error message was generated by an \errmessage
-command, so I can't give any explicit help.
-Pretend that you're Hercule Poirot: Examine all clues,
-and deduce the truth by order and method.
+[4
 
-
-c:/Users/chith/Downloads/Study/HK251/DA_TKLL/Report/main.tex:103: Package pgfkeys Error: I do not know the key '/tikz/l', to which you passed 'LED1', and I am going to ignore it. Perhaps you misspelled it.
-
-See the pgfkeys package documentation for explanation.
-Type  H <return>  for immediate help.
- ...                                              
-                                                  
-l.103           to[LED, l=LED1] (2,0)
-                                     
-(That was another \errmessage.)
-
-
-c:/Users/chith/Downloads/Study/HK251/DA_TKLL/Report/main.tex:109: Package pgfkeys Error: I do not know the key '/tikz/LED' and I am going to ignore it. Perhaps you misspelled it.
-
-See the pgfkeys package documentation for explanation.
-Type  H <return>  for immediate help.
- ...                                              
-                                                  
-l.109           to[LED, l=LED2] (4,0)
-                                     
-(That was another \errmessage.)
-
-
-c:/Users/chith/Downloads/Study/HK251/DA_TKLL/Report/main.tex:109: Package pgfkeys Error: I do not know the key '/tikz/l', to which you passed 'LED2', and I am going to ignore it. Perhaps you misspelled it.
-
-See the pgfkeys package documentation for explanation.
-Type  H <return>  for immediate help.
- ...                                              
-                                                  
-l.109           to[LED, l=LED2] (4,0)
-                                     
-(That was another \errmessage.)
-
-
-
-[4]
-
-c:/Users/chith/Downloads/Study/HK251/DA_TKLL/Report/main.tex:182: LaTeX Error: Not allowed in LR mode.
-
-See the LaTeX manual or LaTeX Companion for explanation.
-Type  H <return>  for immediate help.
- ...                                              
-                                                  
-l.182 ...ocess, below of=delay1] {Turn OFF LED1\\T
-                                                  urn ON LED2};
-You've lost some text.  Try typing  <return>  to proceed.
-If that doesn't work, type  X <return>  to quit.
-
-
-LaTeX Warning: `h' float specifier changed to `ht'.
-
-
+ <./graphics/Interface_lab1.pdf>]
 
 [5]
+\openout2 = `contents/FSM.aux'.
 
-[6] (output/main.aux)
+
+No file contents/FSM.tex.
+\openout2 = `contents/func_implementation.aux'.
+
+(./contents/func_implementation.tex
+LaTeX Font Info:    Trying to load font information for T5+cmtt on input line 5.
+ (c:/texlive/2025/texmf-dist/tex/latex/vntex/t5cmtt.fd
+File: t5cmtt.fd 1999/05/25 v2.5h Standard LaTeX font definitions
+)
+LaTeX Font Info:    Trying to load font information for TS1+ptm on input line 7.
+ (c:/texlive/2025/texmf-dist/tex/latex/psnfss/ts1ptm.fd
+File: ts1ptm.fd 2001/06/04 font definitions for TS1/ptm.
+)
+Overfull \hbox (3.14308pt too wide) in paragraph at lines 21--22
+[]\T5/ptm/m/n/12 The \T5/cmtt/m/n/12 Control \T5/ptm/m/n/12 module implements a Finite State Machine (FSM) to manage the movement patterns
+ []
+
+
+Overfull \hbox (1.73492pt too wide) in paragraph at lines 24--25
+[]\T5/ptm/b/n/12 Position Calculation\T5/ptm/m/n/12 : It determines the active LED index (\T5/cmtt/m/n/12 cur\T5/ptm/m/n/12 ) by incrementing or decrementing
+ []
+
+
+
+[6
+
+
+
+
+
+
+{c:/texlive/2025/texmf-dist/fonts/enc/dvips/base/8r.enc}])
+
+[7]
+\openout2 = `contents/inter_implementation.aux'.
+
+ (./contents/inter_implementation.tex
+<graphics/Internal_lab1.pdf, id=123, 1156.32pt x 578.16pt>
+File: graphics/Internal_lab1.pdf Graphic file (type pdf)
+<use graphics/Internal_lab1.pdf>
+Package pdftex.def Info: graphics/Internal_lab1.pdf  used on input line 7.
+(pdftex.def)             Requested size: 483.69687pt x 241.8463pt.
+
+Underfull \hbox (badness 10000) in paragraph at lines 19--20
+[]\T5/ptm/m/n/12 Final output bus driving the
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 22--23
+[]\T5/ptm/m/n/12 Control signal to activate the
+ []
+
+
+Underfull \hbox (badness 1189) in paragraph at lines 25--26
+[]\T5/ptm/m/n/12 Current state/index value for the
+ []
+
+
+Underfull \hbox (badness 2961) in paragraph at lines 27--28
+[]\T5/ptm/m/n/12 Dedicated reset for the internal
+ []
+
+
+Overfull \hbox (8.51784pt too wide) in paragraph at lines 12--33
+[][] 
+ []
+
+
+
+[8
+
+
+
+ <./graphics/Internal_lab1.pdf>]
+<graphics/Internal_lab1.1.pdf, id=143, 722.7pt x 867.24pt>
+File: graphics/Internal_lab1.1.pdf Graphic file (type pdf)
+<use graphics/Internal_lab1.1.pdf>
+Package pdftex.def Info: graphics/Internal_lab1.1.pdf  used on input line 38.
+(pdftex.def)             Requested size: 483.69687pt x 580.43907pt.
+
+
+[9]
+Underfull \hbox (badness 10000) in paragraph at lines 47--48
+[]\T5/ptm/m/n/12 Sequence state input used to
+ []
+
+
+Underfull \hbox (badness 1038) in paragraph at lines 48--49
+[]\T5/ptm/m/n/12 Decoded brightness level for the
+ []
+
+
+Underfull \hbox (badness 6094) in paragraph at lines 54--55
+[]\T5/ptm/m/n/12 Initialization signal for internal
+ []
+
+
+
+[10 <./graphics/Internal_lab1.1.pdf>]
+<graphics/FSM_lab1.pdf, id=169, 592.13219pt x 464.69609pt>
+File: graphics/FSM_lab1.pdf Graphic file (type pdf)
+<use graphics/FSM_lab1.pdf>
+Package pdftex.def Info: graphics/FSM_lab1.pdf  used on input line 63.
+(pdftex.def)             Requested size: 483.69687pt x 379.59966pt.
+
+
+[11]
+
+[12 <./graphics/FSM_lab1.pdf>]
+Overfull \hbox (20.1505pt too wide) in paragraph at lines 97--98
+[]\T5/ptm/b/n/12 ACW_STATE\T5/ptm/m/n/12 : At each \T5/cmtt/m/n/12 divclk \T5/ptm/m/n/12 tick, the position moves anti-clockwise and \T5/cmtt/m/n/12 Counter \T5/ptm/m/n/12 is incremented.
+ []
+
+
+Overfull \hbox (16.20306pt too wide) in paragraph at lines 97--98
+\T5/ptm/m/n/12 When \T5/cmtt/m/n/12 Counter = NumCW + NumACW - 1\T5/ptm/m/n/12 , the FSM checks \T5/cmtt/m/n/12 rep\T5/ptm/m/n/12 : if \T5/cmtt/m/n/12 rep = 1\T5/ptm/m/n/12 , it returns to \T5/cmtt/m/n/12 CW_STATE
+ []
+
+)
+
+[13]
+\openout2 = `contents/simulation.aux'.
+
+ (./contents/simulation.tex
+Overfull \hbox (10.24464pt too wide) in paragraph at lines 5--7
+[]\T5/ptm/m/n/12 The testbench configures the Device Under Test (DUT) with specific hardware and timing constants
+ []
+
+
+Overfull \hbox (0.95488pt too wide) in paragraph at lines 17--18
+[]\T5/ptm/b/n/12 Initial Conditions\T5/ptm/m/n/12 : The repeat signal (\T5/cmtt/m/n/12 rep\T5/ptm/m/n/12 ) is initially set to 0 to prevent the FSM from advancing
+ []
+
+
+Overfull \hbox (4.32834pt too wide) in paragraph at lines 23--24
+\T5/cmtt/m/n/12 RUN20_CYCLES \T5/ptm/m/n/12 (representing approximately 40 seconds of system time) to observe the continuous
+ []
+
+
+
+[14
+
+
+
+]
+<graphics/Result_simu.jpg, id=202, 2889.79625pt x 1805.74625pt>
+File: graphics/Result_simu.jpg Graphic file (type jpg)
+<use graphics/Result_simu.jpg>
+Package pdftex.def Info: graphics/Result_simu.jpg  used on input line 34.
+(pdftex.def)             Requested size: 483.69687pt x 302.23361pt.
+
+
+[15 <./graphics/Result_simu.jpg>]
+Overfull \hbox (0.28491pt too wide) in paragraph at lines 53--55
+[]\T5/ptm/b/n/12 Reset Integrity\T5/ptm/m/n/12 : At the start of the simulation, the \T5/cmtt/m/n/12 reset \T5/ptm/m/n/12 signal successfully initializes all registers
+ []
+
+)
+
+[16] (output/main.aux (output/contents/interface.aux) (output/contents/FSM.aux) (output/contents/func_implementation.aux) (output/contents/inter_implementation.aux) (output/contents/simulation.aux))
  ***********
 LaTeX2e <2025-06-01> patch level 1
-L3 programming layer <2025-07-20>
+L3 programming layer <2025-07-19>
  ***********
 
 
-LaTeX Warning: Label(s) may have changed. Rerun to get cross-references right.
+LaTeX Warning: There were multiply-defined labels.
 
-
-Package rerunfilecheck Warning: File `main.out' has changed.
-(rerunfilecheck)                Rerun to get outlines right
-(rerunfilecheck)                or use package `bookmark'.
-
-Package rerunfilecheck Info: Checksums for `main.out':
-(rerunfilecheck)             Before: <no file>
-(rerunfilecheck)             After:  38BB3F0E8F555A62653DFD903EBA419F;1274.
+Package rerunfilecheck Info: File `main.out' has not changed.
+(rerunfilecheck)             Checksum: FCF84750311571490102E8899F68078E;1714.
  ) 
 Here is how much of TeX's memory you used:
- 50244 strings out of 467801
- 1168364 string characters out of 5436090
- 1832551 words of memory out of 5000000
- 78288 multiletter control sequences out of 15000+600000
- 669355 words of font info for 103 fonts, out of 8000000 for 9000
+ 50187 strings out of 467816
+ 1164251 string characters out of 5436431
+ 1832341 words of memory out of 5000000
+ 78139 multiletter control sequences out of 15000+600000
+ 669350 words of font info for 103 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 125i,11n,121p,476b,1139s stack positions out of 10000i,1000n,20000p,200000b,200000s
-<c:/texlive/2025/texmf-dist/fonts/type1/urw/symbol/usyr.pfb><c:/texlive/2025/texmf-dist/fonts/type1/vntex/urwvn/utmb8v.pfb><c:/texlive/2025/texmf-dist/fonts/type1/vntex/urwvn/utmr8v.pfb><c:/texlive/2025/texmf-dist/fonts/type1/vntex/urwvn/utmri8v.pfb>
-Output written on output/main.pdf (6 pages, 112364 bytes).
+ 125i,11n,121p,483b,598s stack positions out of 10000i,1000n,20000p,200000b,200000s
+<c:/texlive/2025/texmf-dist/fonts/type1/vntex/urwvn/utmb8v.pfb><c:/texlive/2025/texmf-dist/fonts/type1/urw/times/utmr8a.pfb><c:/texlive/2025/texmf-dist/fonts/type1/vntex/urwvn/utmr8v.pfb><c:/texlive/2025/texmf-dist/fonts/type1/vntex/urwvn/utmri8v.pfb><c:/texlive/2025/texmf-dist/fonts/type1/vntex/vnr/vntt12.pfb>
+Output written on output/main.pdf (16 pages, 1087962 bytes).
 PDF statistics:
- 78 PDF objects out of 1000 (max. 8388607)
- 59 compressed objects within 1 object stream
- 21 named destinations out of 1000 (max. 500000)
- 18 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 250 PDF objects out of 1000 (max. 8388607)
+ 199 compressed objects within 2 object streams
+ 42 named destinations out of 1000 (max. 500000)
+ 139 words of extra memory for PDF output out of 10000 (max. 10000000)
 
