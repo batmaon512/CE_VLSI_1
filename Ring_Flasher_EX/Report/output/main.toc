@@ -1,8 +1,13 @@
 \babel@toc {vietnamese}{}\relax 
-\contentsline {section}{\numberline {1}Introduction}{4}{section.1}%
-\contentsline {subsection}{\numberline {1.1}TikZ Drawing Examples}{4}{subsection.1.1}%
-\contentsline {subsubsection}{\numberline {1.1.1}Basic Shapes and Patterns}{4}{subsubsection.1.1.1}%
-\contentsline {subsubsection}{\numberline {1.1.2}Microcontroller Pin Diagram}{4}{subsubsection.1.1.2}%
-\contentsline {subsubsection}{\numberline {1.1.3}Circuit Diagram with CircuitTikZ}{4}{subsubsection.1.1.3}%
-\contentsline {subsubsection}{\numberline {1.1.4}Animation Sequence Diagram}{5}{subsubsection.1.1.4}%
-\contentsline {subsubsection}{\numberline {1.1.5}Flowchart Example}{5}{subsubsection.1.1.5}%
+\contentsline {section}{\numberline {1}Interface}{4}{section.1}%
+\contentsline {section}{\numberline {2}Functional implementation}{6}{section.2}%
+\contentsline {subsection}{\numberline {2.1} PWM Generator Module}{6}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2} Clock Divider Module}{6}{subsection.2.2}%
+\contentsline {subsection}{\numberline {2.3} Controller Module}{6}{subsection.2.3}%
+\contentsline {subsection}{\numberline {2.4} Ring Flasher Module}{7}{subsection.2.4}%
+\contentsline {section}{\numberline {3}Internal implementation}{8}{section.3}%
+\contentsline {subsection}{\numberline {3.1}Overall architecture}{8}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}State machine}{11}{subsection.3.2}%
+\contentsline {section}{\numberline {4}Simulation}{12}{section.4}%
+\contentsline {subsection}{\numberline {4.1}Testbench}{12}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}Simulation results}{13}{subsection.4.2}%

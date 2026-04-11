@@ -102,6 +102,7 @@
 \AtBeginDocument{\counterwithin{figure}{section}}
 
 \AtBeginDocument{\renewcommand*\bibname{References}}
+\AtBeginDocument{\renewcommand{\figurename}{Image}}
 
 \hypersetup{
   colorlinks=true,
@@ -122,7 +123,7 @@
     % --- BỎ ĐOẠN FOOTER CŨ VÀ THAY BẰNG ĐOẠN MỚI ---
     % Trang chẵn (Even pages)
     \fancyfoot[LE]{\thepage} % Số trang bên trái
-    \fancyfoot[RE]{\it{Microcontroller}} % Chữ bên phải
+    \fancyfoot[RE]{\it{Logic Design}} % Chữ bên phải
 
     % Trang lẻ (Odd pages)
     \fancyfoot[LO]{\it{HCMUT - Computer Engineering}} % Chữ bên trái
