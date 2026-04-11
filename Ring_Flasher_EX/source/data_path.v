@@ -38,6 +38,7 @@ wire [$clog2(NumLed):0] cur;
 wire [NumLed-1:0] off_led;
 wire off_all_led;
 wire ena_div;
+wire n_rst_div;
 wire divclk;
 
 genvar i;
@@ -64,8 +65,8 @@ always @(posedge divclk or posedge reset) begin
     end
 end
 assign off_all_led = &off_led;
-Control #(.NumLed(NumLed), .NumCW(NumCW), .NumACW(NumACW)) C(.cur(cur), .ena_div(ena_div), .clk(clk), .divclk(divclk), .rep(rep), .rst(reset), .off_all(off_all_led));
-clock_divider_module #(.CLK_FREQ_HZ(ClockSpeed), .STEP_TIME_S(TimeStep/1000.0)) CDM(.clk(clk), .rst_n(~reset), .enable_timer(ena_div), .step_tick(divclk));
+Control #(.NumLed(NumLed), .NumCW(NumCW), .NumACW(NumACW)) C(.cur(cur), .ena_div(ena_div), .n_rst_div(n_rst_div), .clk(clk), .divclk(divclk), .rep(rep), .rst(reset), .off_all(off_all_led));
+clock_divider_module #(.CLK_FREQ_HZ(ClockSpeed), .STEP_TIME_S(TimeStep/1000.0)) CDM(.clk(clk), .rst_n(n_rst_div), .enable_timer(ena_div), .step_tick(divclk));
 endmodule
 
 
@@ -113,9 +114,10 @@ module Control#(
     parameter CW_STATE = 1,
     parameter ACW_STATE = 2,
     parameter OFF_STATE =3
-)(cur, ena_div, clk, divclk, rep, rst, off_all);
+)(cur, ena_div, n_rst_div, clk, divclk, rep, rst, off_all);
     output [$clog2(NumLed):0] cur;
     output reg ena_div;
+    output reg n_rst_div;
     input clk;
     input divclk;
     input rep;
@@ -134,9 +136,11 @@ module Control#(
     always @(posedge clk) begin
         if ((rep == 0) && (State == IDLE_STATE)) begin
             ena_div <= 0;
+            n_rst_div <= 0;
         end
         else begin
             ena_div <= 1;
+            n_rst_div <= 1;
         end
     end
     

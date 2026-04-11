@@ -1,0 +1,61 @@
+\section{Internal implementation}
+
+\subsection{Overall architecture}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{graphics/Internal_lab1.pdf}
+    \caption{The Block diagram of the Ring Flasher module.}
+\end{figure}
+
+\subsection*{Table 1: Top-Level Module (Ring\_Flasher\_EX) }
+\begin{tabular}{lp{2.5cm}llp{6cm}}
+\toprule
+\textbf{Component} & \textbf{Signal Name} & \textbf{Direction} & \textbf{Width} & \textbf{Description} \\
+\midrule
+External Interface & CIK  & Input & 1-bit & Main system clock source. \\
+                   & Rep  & Input & 1-bit & Repeat control signal for sequence logic. \\
+                   & Rst & Input & 1-bit & Global system reset. \\
+                   & LED  & Output & 16-bit & Final output bus driving the hardware LEDs. \\
+\midrule
+Clock Divider      & step\_tick  & Output & 1-bit & Pulses used to increment sequence timing. \\
+                   & enable\_timer & Input & 1-bit & Control signal to activate the internal timer. \\
+                   & rst\_n  & Input & 1-bit & Active-low reset for the divider sub-module. \\
+\midrule
+Controller         & cur  & Output & 4-bit & Current state/index value for the LED sequence. \\
+                   & ena\_div  & Output & 1-bit & Enable signal sent to the divider components. \\
+                   & n\_rst\_div  & Output & 1-bit & Dedicated reset for the internal divider logic. \\
+                   & off\_all  & Output & 1-bit & Global override signal to disable all LED outputs. \\
+\midrule
+LED BLOCK          & ledout  & Output & 16-bit & Internal bus that drives the external LED signals. \\
+\bottomrule
+\end{tabular}
+
+\vspace{1cm}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{graphics/Internal_lab1.1.pdf}
+    \caption{The Block diagram of the LED BLOCK.}
+\end{figure}
+
+\subsection*{Table 2: LED BLOCK Internal Structure }
+\begin{tabular}{lp{2.5cm}llp{6cm}}
+\toprule
+\textbf{Sub-Module} & \textbf{Signal Name} & \textbf{Direction} & \textbf{Width} & \textbf{Description} \\
+\midrule
+Divider      & cur  & Input & 4-bit & Sequence state input used to determine brightness. \\
+                   & Level  & Output & 3-bit & Decoded brightness level for the PWM generator. \\
+\midrule
+PWM   & Level & Input & 3-bit & Target duty cycle for the pulse width modulation. \\
+                   & ledout & Output & 1-bit & Modulated 1-bit signal for a single LED channel. \\
+\midrule
+Global Signals     & Clk & Input & 1-bit & Synchronous clock for all internal registers. \\
+                   & Rst & Input & 1-bit & Initialization signal for internal components. \\
+\bottomrule
+\end{tabular}
+
+
+\subsection{State machine}
+
+

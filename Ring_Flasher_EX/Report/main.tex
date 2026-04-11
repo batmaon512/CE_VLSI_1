@@ -3,6 +3,8 @@
 % Packages for TikZ drawing
 \usepackage{tikz}
 \usepackage{circuitikz} % For electrical circuits
+\usepackage{float}
+\usepackage{enumitem}
 \usetikzlibrary{shapes.geometric, arrows, positioning, patterns, decorations.pathmorphing}
 
 % Configuration
@@ -11,15 +13,16 @@
 \uniname{HO CHI MINH CITY UNIVERSITY OF TECHNOLOGY}
 \deptname{FACULTY OF COMPUTER SCIENCE AND ENGINEERING}
 
-\coursename{\LARGE Microcontrollers \\ \large (CO3117)}
+\coursename{\LARGE Semiconductors \\ \large (CO3117)}
 \reporttype{\Large Report Lab 1}
-\title{\Large LED ANIMATIONS}
+\title{\Large Ring Flasher Design and Simulation}
 
 \advisor{
-TS. Lê Trọng Nhân
+Tôn Huỳnh Long
 }
 \student{
-   Nguyễn Chí Thanh, 2313078
+   Nguyễn Chí Thanh, 2313078 \\
+   Nguyễn Việt Hoàng, 2311066 \\
 }
 \setlength{\parindent}{2em}
 \begin{document}
@@ -28,6 +31,11 @@ TS. Lê Trọng Nhân
 \tableofcontents
 \pagestyle{fancy}
 \pagebreak
+
+\include{contents/interface}
+\include{contents/func_implementation}
+\include{contents/inter_implementation}
+\include{contents/simulation}
 
 
 \end{document}

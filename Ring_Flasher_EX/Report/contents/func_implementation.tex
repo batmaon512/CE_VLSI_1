@@ -1,0 +1,34 @@
+\section{Functional implementation}
+
+
+\subsection{ PWM Generator Module}
+The \texttt{PWM} module is responsible for controlling the brightness of individual LEDs by modulating the output duty cycle based on a 3-bit input level.
+\begin{itemize}[noitemsep]
+    \item \textbf{Period Management}: It utilizes a 3-bit counter, \texttt{pwm\_cnt}, which cycles from 0 to 4 to establish the pulse period.
+    \item \textbf{Duty Cycle Logic}: The \texttt{ledout} signal is driven high whenever the current counter value is less than the specified \texttt{level}.
+    \item \textbf{Error Handling}: The module includes logic to force a 100\% duty cycle (\texttt{ledout = 1}) if the input level exceeds the maximum value of 5, preventing output glitche.
+\end{itemize}
+
+\subsection{ Clock Divider Module}
+The \texttt{clock\_divider\_module} scales the high-frequency system clock down to a timing interval suitable for human-perceivable LED transitions.
+\begin{itemize}[noitemsep]
+    \item \textbf{Dynamic Counting}: It calculates a \texttt{MAX\_COUNT} value using parameters for clock frequency (\texttt{CLK\_FREQ\_HZ}) and desired step time (\texttt{STEP\_TIME\_S}).
+    \item \textbf{Enable Control}: The timing logic is gated by an \texttt{enable\_timer} signal, ensuring the sequence only advances when active.
+    \item \textbf{Tick Generation}: Upon reaching the calculated count, it asserts a single-cycle \texttt{step\_tick} (referred to as \texttt{divclk} in the top module) to trigger state updates.
+\end{itemize}
+
+\subsection{ Controller Module}
+The \texttt{Control} module implements a Finite State Machine (FSM) to manage the movement patterns of the LED ring.
+\begin{itemize}[noitemsep]
+    \item \textbf{State Machine}: The logic transitions through four states: \texttt{IDLE\_STATE}, \texttt{CW\_STATE} (Clockwise), \texttt{ACW\_STATE} (Anti-clockwise), and \texttt{OFF\_STATE}.
+    \item \textbf{Position Calculation}: It determines the active LED index (\texttt{cur}) by incrementing or decrementing the position register based on the current state and the \texttt{rep} (repeat) input.
+    \item \textbf{Gating Logic}: It manages the \texttt{ena\_div} signal to enable the system clock divider and monitors the \texttt{off\_all} feedback to determine when to return to the idle state.
+\end{itemize}
+
+\subsection{ Ring Flasher Module}
+The \texttt{Ring\_Flasher\_EX} is the top-level module that integrates the controller, clock divider, and LED drive logic.
+\begin{itemize}[noitemsep]
+    \item \textbf{Parallel LED Driving}: It uses a Verilog \texttt{generate} loop to instantiate a dedicated \texttt{PWM} module for every LED in the system.
+    \item \textbf{Fading Trail Implementation}: For every time step, it updates a \texttt{Level\_LED} array where the current active index is set to maximum brightness (Level 5), while all other LEDs gradually decrement their brightness level until they reach zero.
+    \item \textbf{Synchronous Integration}: It routes the \texttt{divclk} from the clock divider to drive the sequential logic of the controller and the brightness update registers.
+\end{itemize}
