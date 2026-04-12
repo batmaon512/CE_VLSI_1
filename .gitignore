@@ -1,0 +1,35 @@
+# LaTeX build files
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.pdf
+
+# Build outputs
+build/
+output/
+
+# Simulation files
+*.vvp
+*.o
+*.so
+*.a
+*.vcd
+*.lxt
+
+# Editor files
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+desktop.ini
+
+# OS files
+Thumbs.db
+.Thumbs.db
