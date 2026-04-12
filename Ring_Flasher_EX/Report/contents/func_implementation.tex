@@ -1,20 +1,28 @@
 \section{Functional implementation}
 
 
-\subsection{ PWM Generator Module}
+\subsection{PWM Generator Module}
 The \texttt{PWM} module is responsible for controlling the brightness of individual LEDs by modulating the output duty cycle based on a 3-bit input level.
 \begin{itemize}[noitemsep]
-    \item \textbf{Period Management}: It utilizes a 3-bit counter, \texttt{pwm\_cnt}, which cycles from 0 to 4 to establish the pulse period.
-    \item \textbf{Duty Cycle Logic}: The \texttt{ledout} signal is driven high whenever the current counter value is less than the specified \texttt{level}.
-    \item \textbf{Error Handling}: The module includes logic to force a 100\% duty cycle (\texttt{ledout = 1}) if the input level exceeds the maximum value of 5, preventing output glitche.
+    \item \textbf{Period Management}: It utilizes a 3-bit counter, \texttt{pwm\_cnt}, which cycles from 0 to 4 to establish the pulse period (6 brightness levels: 0\%–100\%).
+    \item \textbf{Duty Cycle Logic}: The \texttt{ledout} signal is driven high whenever the current counter value is less than the specified \texttt{level}, generating a proportional duty cycle.
+    \item \textbf{Error Handling}: The module includes logic to force a 100\% duty cycle (\texttt{ledout = 1}) if the input level exceeds the maximum value of 5, preventing output glitches.
 \end{itemize}
 
-\subsection{ Clock Divider Module}
+\subsection{LED Status Module}
+The \texttt{LedStatus} module manages the brightness level of a single LED based on the current active position in the ring.
+\begin{itemize}[noitemsep]
+    \item \textbf{Position Detection}: For each LED identified by \texttt{led\_id}, it compares against the Controller's output \texttt{cur} (current active position).
+    \item \textbf{Brightness Assignment}: When \texttt{cur == led\_id}, the LED is assigned the maximum brightness level (5 out of 6). Otherwise, the brightness gradually decays by decrementing its level on each clock cycle until reaching zero.
+    \item \textbf{Fading Tail Effect}: This creates a trailing effect where previously active LEDs gradually fade out, forming a visible light trail around the ring.
+\end{itemize}
+
+\subsection{Clock Divider Module}
 The \texttt{clock\_divider\_module} scales the high-frequency system clock down to a timing interval suitable for human-perceivable LED transitions.
 \begin{itemize}[noitemsep]
     \item \textbf{Dynamic Counting}: It calculates a \texttt{MAX\_COUNT} value using parameters for clock frequency (\texttt{CLK\_FREQ\_HZ}) and desired step time (\texttt{STEP\_TIME\_S}).
     \item \textbf{Enable Control}: The timing logic is gated by an \texttt{enable\_timer} signal, ensuring the sequence only advances when active.
-    \item \textbf{Tick Generation}: Upon reaching the calculated count, it asserts a single-cycle \texttt{step\_tick} (referred to as \texttt{divclk} in the top module) to trigger state updates.
+    \item \textbf{Tick Generation}: Upon reaching the calculated count, it asserts a single-cycle \texttt{step\_tick} (referred to as \texttt{divclk} in the top module) to trigger state and brightness updates.
 \end{itemize}
 
 \subsection{ Controller Module}

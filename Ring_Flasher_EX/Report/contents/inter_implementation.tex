@@ -8,26 +8,27 @@
     \caption{The Block diagram of the Ring Flasher module.}
 \end{figure}
 
-\subsection*{Table 1: Top-Level Module (Ring\_Flasher\_EX) }
+\subsection*{Table 1: Top-Level Module (Ring\_Flasher\_EX)}
 \begin{tabular}{lp{2.5cm}llp{6cm}}
 \toprule
 \textbf{Component} & \textbf{Signal Name} & \textbf{Direction} & \textbf{Width} & \textbf{Description} \\
 \midrule
-External Interface & CIK  & Input & 1-bit & Main system clock source. \\
-                   & Rep  & Input & 1-bit & Repeat control signal for sequence logic. \\
-                   & Rst & Input & 1-bit & Global system reset. \\
-                   & LED  & Output & 16-bit & Final output bus driving the hardware LEDs. \\
+External Interface & clk  & Input  & 1-bit  & Main system clock source. \\
+                  & rep  & Input  & 1-bit  & Repeat control signal for sequence logic. \\
+                  & rst  & Input  & 1-bit  & Global system reset. \\
+                  & LED  & Output & 16-bit & Final output bus driving the hardware LEDs. \\
 \midrule
-Clock Divider      & step\_tick  & Output & 1-bit & Pulses used to increment sequence timing. \\
-                   & enable\_timer & Input & 1-bit & Control signal to activate the internal timer. \\
-                   & rst\_n  & Input & 1-bit & Active-low reset for the divider sub-module. \\
+Clock Divider      & step\_tick     & Output & 1-bit & Pulse used to update the sequence timing. \\
+                  & enable\_timer  & Input  & 1-bit & Control signal to activate the internal timer. \\
+                  & rst\_n         & Input  & 1-bit & Active-low reset for the divider sub-module. \\
 \midrule
-Controller         & cur  & Output & 4-bit & Current state/index value for the LED sequence. \\
-                   & ena\_div  & Output & 1-bit & Enable signal sent to the divider components. \\
-                   & n\_rst\_div  & Output & 1-bit & Dedicated reset for the internal divider logic. \\
-                   & off\_all  & Output & 1-bit & Global override signal to disable all LED outputs. \\
+Controller         & cur        & Output & 4-bit & Current LED index for the sequence. \\
+                  & ena\_div    & Output & 1-bit & Enable signal sent to the clock divider. \\
+                  & n\_rst\_div & Output & 1-bit & Dedicated reset for the internal divider logic. \\
+                  & off\_all    & Input  & 1-bit & Feedback signal indicating all LEDs are off. \\
 \midrule
-LED BLOCK          & ledout  & Output & 16-bit & Internal bus that drives the external LED signals. \\
+LED BLOCK          & ledout     & Output & 16-bit & Internal LED drive bus. \\
+                  & off\_all    & Output & 1-bit  & NOR-reduction output used to detect when all LEDs are off. \\
 \bottomrule
 \end{tabular}
 
@@ -39,19 +40,23 @@ LED BLOCK          & ledout  & Output & 16-bit & Internal bus that drives the ex
     \caption{The Block diagram of the LED BLOCK.}
 \end{figure}
 
-\subsection*{Table 2: LED BLOCK Internal Structure }
-\begin{tabular}{lp{2.5cm}llp{6cm}}
+\subsection*{Table 2: LED BLOCK Internal Structure}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{>{\raggedright\arraybackslash}p{2.6cm} p{2.4cm} l l p{6cm}}
 \toprule
 \textbf{Sub-Module} & \textbf{Signal Name} & \textbf{Direction} & \textbf{Width} & \textbf{Description} \\
 \midrule
-Divider      & cur  & Input & 4-bit & Sequence state input used to determine brightness. \\
-                   & Level  & Output & 3-bit & Decoded brightness level for the PWM generator. \\
+\multirow{3}{*}{LedStatus} & cur    & Input  & 4-bit & Current LED position from the Controller. \\
+                           & led\_id & Input  & 4-bit & Index of the LED block being controlled. \\
+                           & level   & Output & 3-bit & Brightness level of the corresponding LED. \\
 \midrule
-PWM   & Level & Input & 3-bit & Target duty cycle for the pulse width modulation. \\
-                   & ledout & Output & 1-bit & Modulated 1-bit signal for a single LED channel. \\
+\multirow{4}{*}{PWM}       & clk     & Input  & 1-bit & System clock used for PWM generation. \\
+                           & reset   & Input  & 1-bit & Reset signal for the PWM logic. \\
+                           & level   & Input  & 3-bit & Brightness level received from LedStatus. \\
+                           & ledout  & Output & 1-bit & PWM output that drives one LED channel. \\
 \midrule
-Global Signals     & Clk & Input & 1-bit & Synchronous clock for all internal registers. \\
-                   & Rst & Input & 1-bit & Initialization signal for internal components. \\
+NOR Reduction Gate         & input   & Input  & 16-bit & LED brightness vector used to detect when all LEDs are off. \\
+                           & off\_all & Output & 1-bit & Goes high when all LED brightness levels are zero. \\
 \bottomrule
 \end{tabular}
 
