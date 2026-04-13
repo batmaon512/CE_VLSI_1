@@ -34,7 +34,7 @@ module tb_Ring_Flasher_EX;
         .TimeStep(TimeStep)
     ) dut (
         .clk(clk),
-        .reset(reset),
+        .n_reset(reset),
         .rep(rep),
         .LedOut(LedOut)
     );

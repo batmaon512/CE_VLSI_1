@@ -28,7 +28,7 @@ module Ring_Flasher_EX #(
     parameter TimeStep     = 500 //ms
 )(
     input wire                          clk,
-    input wire                          reset,
+    input wire                          n_reset, 
     input wire                          rep,
     output wire [NumLed-1:0]    LedOut
 );
@@ -40,6 +40,9 @@ wire off_all_led;
 wire ena_div;
 wire n_rst_div;
 wire divclk;
+wire reset;
+
+assign reset = ~n_reset;
 
 genvar i;
 generate
