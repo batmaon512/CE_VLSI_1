@@ -46,143 +46,62 @@ The professional testbench is organized into independent task-based test cases, 
     \includegraphics[width=1\linewidth]{graphics/TC1_Normal_Operation1.png}
     \caption{Zoomed waveform of TC1: Fade-Out - demonstrates brightness decrementing on each \texttt{divclk}.}
 \end{figure}
-\subsubsection{TC2: Short Burst Test}
+\subsubsection{TC2: Mid-cycle Rep-off Test}
 
-\textbf{Objective}: Verify system response to brief activation pulses and proper cycle completion before fade-out.
+\textbf{Objective}: Verify the ring flasher behavior when \texttt{rep} is deasserted mid-cycle, including the one-divclk delay before the first bright state.
 
 \textbf{Test Flow}:
 \begin{enumerate}
     \item Apply reset
-    \item Set \texttt{rep = 1} and run for $2 \times \text{CLK\_FREQ}$ cycles ($\approx 0.4$ seconds)
-    \item Set \texttt{rep = 0} and run for $2 \times \text{CLK\_FREQ}$ cycles to observe fade-out
+    \item Set \texttt{rep = 1} and observe the first active transition after one divided-clock pulse
+    \item Keep \texttt{rep = 1} long enough for the FSM to complete one full upward ring sequence
+    \item Set \texttt{rep = 0} during operation and observe that fade-out starts only after the current upward cycle finishes
 \end{enumerate}
 
 \textbf{Expected Behavior}:
 \begin{itemize}
-    \item FSM transitions to CW\_STATE and advances LED position for a few steps
-    \item Upon \texttt{rep = 0}: FSM completes the current CW phase before entering OFF\_STATE
-    \item After cycle completion: brightness decays on each \texttt{divclk} pulse until all LEDs fade
-    \item Validates correct handling of incomplete sequence cycles with proper termination
+    \item After \texttt{rep = 1} is asserted, the FSM waits for one \texttt{divclk} pulse before entering the first bright state
+    \item LED sequence begins from the initial state and performs the full upward run before any fade-out action
+    \item If \texttt{rep} goes low mid-cycle, the FSM does not fade out immediately
+    \item The design finishes the current upward ring movement, then transitions to OFF\_STATE and fades out
+    \item After brightness reaches zero, the FSM returns to the initial IDLE state
+    \item Confirms the intended delayed start and deferred fade-out behavior of the controller
 \end{itemize}
 
 \begin{figure}[H]
     \centering
-    % \includegraphics[width=1\linewidth]{graphics/TC2_Short_Burst.jpg}
-    \caption{Waveform of TC2: Short Burst - demonstrates cycle completion and fade-out behavior.}
+    % Place waveform image for TC2 here.
+    \includegraphics[width=1\linewidth]{graphics/TC2.png}
+    \caption{Waveform of TC2: Mid-cycle rep-off behavior - demonstrates the delayed start, completion of the upward sequence, and deferred fade-out.}
 \end{figure}
 
-\subsubsection{TC3: Repeat Toggle Test}
+\subsubsection{TC3: Mid-run Reset Test}
 
-\textbf{Objective}: Verify FSM robustness when \texttt{rep} signal is toggled during operation.
-
-\textbf{Test Flow}:
-\begin{enumerate}
-    \item Apply reset
-    \item Set \texttt{rep = 1} for $3 \times \text{CLK\_FREQ}$ cycles
-    \item Set \texttt{rep = 0} for $1 \times \text{CLK\_FREQ}$ cycle
-    \item Set \texttt{rep = 1} again for $3 \times \text{CLK\_FREQ}$ cycles
-    \item Set \texttt{rep = 0} for $1 \times \text{CLK\_FREQ}$ cycle
-\end{enumerate}
-
-\textbf{Expected Behavior}:
-\begin{itemize}
-    \item First activation: LED sequence starts from position 0, advances during CW phase
-    \item First deactivation: FSM completes current cycle, enters OFF\_STATE, LEDs fade to zero
-    \item \texttt{off\_all} triggers when all LEDs are dark, FSM transitions to IDLE\_STATE
-    \item Second activation: FSM returns to CW\_STATE and resumes new sequence cycle
-    \item Demonstrates correct state recovery and continuous sequence operation
-    \item Validates \texttt{off\_all} feedback mechanism during complete fade-out-to-idle transitions
-\end{itemize}
-
-\begin{figure}[H]
-    \centering
-    % \includegraphics[width=1\linewidth]{graphics/TC3_Repeat_Toggle.jpg}
-    \caption{Waveform of TC3: Repeat Toggle - shows complete FSM state cycles with proper idle transitions.}
-\end{figure}
-
-\subsubsection{TC4: Reset Re-entry Test}
-
-\textbf{Objective}: Verify system initialization and recovery when reset is asserted during active operation.
+\textbf{Objective}: Verify that asserting reset in the middle of operation stops the system immediately and returns it to the initial state.
 
 \textbf{Test Flow}:
 \begin{enumerate}
     \item Apply reset
-    \item Set \texttt{rep = 1} for $2 \times \text{CLK\_FREQ}$ cycles
-    \item Mid-run reset: assert \texttt{reset = 1} for 3 clock cycles, then release
-    \item Resume operation: set \texttt{rep = 1} for $3 \times \text{CLK\_FREQ}$ cycles
-    \item Deactivate: set \texttt{rep = 0} for $1 \times \text{CLK\_FREQ}$ cycle
+    \item Set \texttt{rep = 1} and let the sequence run normally
+    \item Assert \texttt{reset = 1} in the middle of the sequence
+    \item Release reset and observe the system return to the initial state
+    \item Re-apply \texttt{rep = 1} if needed to confirm restart from the beginning
 \end{enumerate}
 
 \textbf{Expected Behavior}:
 \begin{itemize}
-    \item Upon reset assertion, all brightness levels immediately return to zero
-    \item All LED outputs go low regardless of PWM state
-    \item After reset release, FSM returns to IDLE\_STATE
-    \item Re-application of \texttt{rep = 1} correctly restarts sequence from position 0
-    \item System resumes normal operation with proper cycle completion before OFF\_STATE
-    \item Validates reset integrity and synchronous design principles
+    \item When \texttt{reset} is asserted, all outputs stop immediately without waiting for the current cycle to finish
+    \item LED activity is cleared at once and the FSM returns to the initial state
+    \item After reset release, the controller remains in IDLE until \texttt{rep} is asserted again
+    \item Confirms that reset has higher priority than the normal fade-out path
+    \item Validates immediate termination behavior when reset is toggled during operation
 \end{itemize}
 
 \begin{figure}[H]
     \centering
-    % \includegraphics[width=1\linewidth]{graphics/TC4_Reset_Reentry.jpg}
-    \caption{Waveform of TC4: Reset Re-entry - demonstrates immediate state reset and successful recovery.}
-\end{figure}
-
-\subsubsection{TC5: Long Stability Test}
-
-\textbf{Objective}: Verify sustained operation over extended duration without timing drift or register overflow.
-
-\textbf{Test Flow}:
-\begin{enumerate}
-    \item Apply reset
-    \item Set \texttt{rep = 1} for $60 \times \text{CLK\_FREQ}$ cycles ($\approx 12$ seconds)
-    \item Set \texttt{rep = 0} for $5 \times \text{CLK\_FREQ}$ cycles
-\end{enumerate}
-
-\textbf{Expected Behavior}:
-\begin{itemize}
-    \item CW/ACW sequences repeat 5+ complete cycles with consistent timing
-    \item Each cycle executes exactly 12 CW steps followed by 8 ACW steps
-    \item No jitter or phase shift in \texttt{divclk} pulse generation
-    \item No register overflow or saturation effects
-    \item Upon \texttt{rep = 0}: system completes final cycle then enters OFF\_STATE
-    \item Brightness decay pattern remains linear and predictable
-    \item Validates long-term clock divider stability and counter arithmetic
-\end{itemize}
-
-\begin{figure}[H]
-    \centering
-    % \includegraphics[width=1\linewidth]{graphics/TC5_Long_Stability.jpg}
-    \caption{Waveform of TC5: Long Stability - shows multiple complete repetitions with consistent cycle timing.}
-\end{figure}
-
-\subsubsection{TC6: Fade-out and off\_all Transition Test}
-
-\textbf{Objective}: Verify the end-of-sequence detection mechanism and correct transition to IDLE\_STATE.
-
-\textbf{Test Flow}:
-\begin{enumerate}
-    \item Apply reset
-    \item Set \texttt{rep = 1} for $10 \times \text{CLK\_FREQ}$ cycles
-    \item Set \texttt{rep = 0} and observe for $10 \times \text{CLK\_FREQ}$ cycles
-    \item Monitor \texttt{off\_all} signal during fade-out
-\end{enumerate}
-
-\textbf{Expected Behavior}:
-\begin{itemize}
-    \item Upon \texttt{rep = 0}: FSM completes current CW or ACW cycle before entering OFF\_STATE
-    \item In OFF\_STATE: LED brightness levels decrement on each \texttt{divclk} pulse
-    \item Brightness decrements from level 5 down to level 0 sequentially
-    \item When all LED brightness levels reach zero, \texttt{off\_all} signal pulses high
-    \item FSM transitions back to IDLE\_STATE upon \texttt{off\_all = 1}
-    \item Validates NOR reduction gate operation and proper feedback control loop closure
-\end{itemize}
-
-\begin{figure}[H]
-    \centering
-    % \includegraphics[width=1\linewidth]{graphics/TC6_Fade_out_Off_All.jpg}
-    \caption{Waveform of TC6: Fade-out and off\_all Transition - demonstrates complete brightness decay sequence and idle transition.}
+    % Place waveform image for TC3 here.
+    \includegraphics[width=1\linewidth]{graphics/TC3.png}
+    \caption{Waveform of TC3: Mid-run reset behavior - demonstrates immediate stop and return to the initial state.}
 \end{figure}
 
 \subsection{Simulation Results Summary}
@@ -196,11 +115,11 @@ The comprehensive testbench validates the following functional areas:
     
     \item \textbf{Brightness Control}: PWM duty cycles correctly implement 6 brightness levels (0--5) with proper decay during fade-out.
     
-    \item \textbf{Reset Functionality}: Synchronous reset properly clears all state and returns the system to a clean initial condition.
+    \item \textbf{Reset Functionality}: Reset immediately clears the active operation and returns the system to a clean initial condition.
     
     \item \textbf{Feedback Control}: The \texttt{off\_all} signal correctly detects when all LEDs have faded and triggers FSM state transition.
     
     \item \textbf{Clock Divider Stability}: Divider maintains consistent timing across extended operations without drift or overflow.
 \end{itemize}
 
-All test cases pass and demonstrate that the Ring Flasher design meets its functional and timing specifications.
+These three test cases cover the normal operation, deferred fade-out after a mid-cycle \texttt{rep} change, and immediate shutdown on reset, demonstrating that the Ring Flasher design meets its functional and timing specifications.

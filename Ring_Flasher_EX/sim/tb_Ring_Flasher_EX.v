@@ -165,7 +165,10 @@ module tb_Ring_Flasher_EX;
     initial begin
         // $monitor("[%0t] reset=%b rep=%b LedOut=%b", $time, reset, rep, LedOut);
     end
-
+    initial begin
+        $recordfile ("waves");
+        $recordvars ("depth=0", testbench);
+    end
     // Main sequence
     initial begin
         run_normal_case;
