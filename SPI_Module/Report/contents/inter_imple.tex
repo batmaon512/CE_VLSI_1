@@ -1,0 +1,359 @@
+% \section{Internal Implementation}
+
+% \subsection{Overall Architecture}
+
+% The SPI Communication Module is composed of two main hierarchical submodules: \texttt{SPI\_Master} and \texttt{SPI\_Slave}, working in full-duplex mode. The Master initiates all communication, generates the serial clock (SCLK), and controls the Slave Select (SS) signal. The Slave responds passively, synchronizing with the Master's clock and exchanging data bidirectionally through MOSI (Master Out Slave In) and MISO (Master In Slave Out) lines. Both modules employ parallel-to-serial (P2S) and serial-to-parallel (S2P) converters to transform data between parallel and serial domains, with integrated CRC5 error checking for data integrity.
+
+% \subsection{SPI Master Module Implementation}
+
+% \subsubsection*{Master Finite State Machine (FSM)}
+
+% The Master operates as a 4-state FSM controlled by the reference clock REFCLK:
+
+% \begin{itemize}[noitemsep]
+%     \item \textbf{IDLE State}: The module is ready to accept commands. The READY signal is held high (1'b1), and the VALID signal defaults to 1'b1. Based on the 2-bit control signal CNTL:
+%     \begin{itemize}[noitemsep]
+%         \item CNTL = 2'b00: No operation; state remains IDLE.
+%         \item CNTL = 2'b01: Load data from INPUT bus into the internal P2S buffer (M\_load = 1); remains in IDLE.
+%         \item CNTL = 2'b10: Select a slave by decoding the INPUT value. If INPUT $<$ Number\_Slave (8), the corresponding SS bit is pulled low (active). Otherwise, all SS bits remain high (no slave selected).
+%         \item CNTL = 2'b11: Initiate a transmission cycle; state transitions to TRANSFER.
+%     \end{itemize}
+
+%     \item \textbf{TRANSFER State}: The module enters this state when CNTL = 2'b11 and READY is high. READY is immediately pulled low (1'b0) to indicate the module is busy. A 5-bit counter increments from 0 to 12 (Frame\_Size + CRC bits = 8 + 5 = 13 cycles):
+%     \begin{itemize}[noitemsep]
+%         \item \textbf{Data Phase (cycles 0–7)}: The P2S converter shifts the 8-bit data MSB-first through MOSI. Simultaneously, the S2P converter assembles incoming MISO bits into the OUTPUT register. The CRC5 generator computes a checksum of the transmitted bits.
+%         \item \textbf{CRC Phase (cycles 8–12)}: The 5-bit CRC is transmitted through MOSI. The CRC5 checker continues verifying incoming MISO bits. At cycle 12, if the received CRC matches, the VALID signal reflects the checker output (t\_valid); otherwise, VALID = 1'b0.
+%         \item \textbf{Transition Logic}: Once count reaches 13 and CNTL remains 2'b11, the state transitions to COMPLETE. If CNTL changes away from 2'b11, the state transitions to IDLE.
+%     \end{itemize}
+
+%     \item \textbf{COMPLETE State}: This is a holding state ensuring READY remains low until CNTL changes from 2'b11. Once CNTL differs from 2'b11, the FSM returns to IDLE, allowing the next transaction to begin.
+
+%     \item \textbf{Default State}: Should an undefined state occur, the FSM safely resets to IDLE with all control signals held in their inactive state.
+% \end{itemize}
+
+% \subsubsection*{Clock Generation and Synchronization}
+
+% The Master generates SCLK from REFCLK based on CPOL (Clock Polarity) and CPHA (Clock Phase) parameters:
+
+% \begin{itemize}[noitemsep]
+%     \item \textbf{Clock Control Logic}: A parameter \texttt{CLK\_CTRL = CPOL \textasciicircum{} CPHA} determines the internal clock phase relationship. When CLK\_CTRL = 0, SCLK directly reflects REFCLK. When CLK\_CTRL = 1, SCLK is the inverted REFCLK, allowing different data setup and hold times.
+%     \item \textbf{SCLK Gating}: During IDLE and COMPLETE states, SCLK is held at 0. During TRANSFER, SCLK is driven by REFCLK (or its inversion) for up to 13 clock cycles, after which SCLK returns to 0.
+%     \item \textbf{Sampling Edges}: The Slave samples MOSI on clock edges synchronized to the Master's SCLK, ensuring proper temporal alignment of serial data bits.
+% \end{itemize}
+
+% \subsubsection*{Parallel-to-Serial (P2S) Converter}
+
+% The \texttt{Buf\_P2S} module transforms the 8-bit parallel INPUT into serial MOSI:
+
+% \begin{itemize}[noitemsep]
+%     \item \textbf{Load Operation}: When M\_load is asserted in IDLE state, the INPUT value is captured into an internal 8-bit register.
+%     \item \textbf{Shift Operation}: When M\_ena is asserted during TRANSFER, the register shifts left on each SCLK edge (MSB first). The MSB (bit 7) is output to MOSI, and the lower bits rotate leftward, bringing bit 0 to the MSB position.
+%     \item \textbf{Transmission Duration}: The shift operation continues for 8 cycles, after which the buffer holds its shifted state (with all zeros flushed in from the right).
+% \end{itemize}
+
+% \subsubsection*{Serial-to-Parallel (S2P) Converter}
+
+% The \texttt{Buf\_S2P} module collects serial MISO bits into an 8-bit parallel OUTPUT:
+
+% \begin{itemize}[noitemsep]
+%     \item \textbf{Capture Logic}: On each SCLK edge during TRANSFER where S\_ena is high, the MISO bit is sampled into the MSB of an internal register.
+%     \item \textbf{Accumulation}: Previous bits are shifted right, building the parallel word LSB-to-MSB. After 8 clock edges, the complete 8-bit received data is available at OUTPUT.
+%     \item \textbf{Enable Gating}: S\_ena is held high for only the first 7 cycles to allow the 8th bit to settle before CRC phase begins.
+% \end{itemize}
+
+% \subsubsection*{CRC5 Generator and Checker}
+
+% To ensure data integrity, the module integrates CRC5 error detection:
+
+% \begin{itemize}[noitemsep]
+%     \item \textbf{CRC5 Generator}: Instantiated as \texttt{u\_crc5}, it computes a 5-bit cyclic redundancy check over the transmitted data bits. The generator uses a polynomial-based feedback shift register that updates on each SCLK edge when M\_ena is high. The computed 5-bit CRC is appended to the 8-bit data frame before transmission.
+%     \item \textbf{CRC5 Checker}: Instantiated as \texttt{u\_crc5\_checker}, it independently recomputes the CRC from received MISO bits. If the recomputed CRC equals zero (indicating correct reception), the output signal \texttt{t\_valid} is asserted (1'b1). Otherwise, it remains low (1'b0).
+%     \item \textbf{Reset and Enable}: Both CRC modules are reset at the start of each transmission cycle (count == 0). The generator is enabled during data bits (M\_ena = 1), while the checker is enabled throughout the entire receive phase (C\_ena = 1 for cycles 0–12).
+% \end{itemize}
+
+% \subsubsection*{Slave Select Decoding}
+
+% The SS output is an active-low 8-bit bus for selecting one of up to 8 slave devices:
+
+% \begin{itemize}[noitemsep]
+%     \item \textbf{Selection Logic}: In IDLE state, when CNTL = 2'b10, the INPUT value is decoded:
+%     \begin{itemize}[noitemsep]
+%         \item If INPUT $<$ 8, the bit position corresponding to INPUT is pulled low, activating the target slave. For example, INPUT = 3 produces SS = 8'b1111\_0111 (SS[3] active).
+%         \item If INPUT $\geq$ 8, all SS bits remain high (8'b1111\_1111), selecting no slave.
+%     \end{itemize}
+%     \item \textbf{Hold Duration}: Once set, SS remains stable throughout the transmission phase (TRANSFER state) until the next command.
+% \end{itemize}
+
+% \subsection{SPI Slave Module Implementation}
+
+% \subsubsection*{Slave Synchronization and Active State Detection}
+
+% The Slave operates in response to the Master's control signals:
+
+% \begin{itemize}[noitemsep]
+%     \item \textbf{Chip Select (CS) Detection}: The active-low CS input (derived from the Master's SS signal) indicates whether this slave is selected. When CS = 0, the slave is active; when CS = 1, it enters the inactive/ready state.
+%     \item \textbf{Internal Clock Generation}: From the received SCLK, the Slave generates an internal clock:
+%     \begin{itemize}[noitemsep]
+%         \item \texttt{inter\_clk = SCLK \textasciicircum{} CLK\_CTRL}
+%     \end{itemize}
+%     where CLK\_CTRL = CPOL \textasciicircum{} CPHA, matching the Master's configuration to ensure aligned sampling edges.
+%     \item \textbf{Counter-Based State Machine}: A counter increments on each inter\_clk edge when CS is active (n\_cs = 0). When CS transitions high, the counter resets. This counter value directly determines the slave's state and ready signal.
+% \end{itemize}
+
+% \subsubsection*{Ready Signal Logic}
+
+% The Slave's READY output indicates its availability for new transactions:
+
+% \begin{itemize}[noitemsep]
+%     \item \textbf{Ready = 1}: The counter is zero, meaning no transmission is active. The Slave is idle and prepared to accept a new load command.
+%     \item \textbf{Ready = 0}: The counter is non-zero, indicating an active transmission. New commands are ignored during this period.
+%     \item \textbf{Asynchronous Reset}: When n\_rst = 0, the counter (and thus the ready state) is asynchronously reset to 0.
+% \end{itemize}
+
+% \subsubsection*{Data Loading Mechanism}
+
+% The LOAD input controls when new data is prepared for transmission:
+
+% \begin{itemize}[noitemsep]
+%     \item \textbf{Load Capture}: When LOAD is high and the Slave is READY (counter = 0), the INPUT data is immediately captured into the P2S buffer. This is an asynchronous operation on the posedge of LOAD.
+%     \item \textbf{Buffer Reset}: After loading, the P2S buffer is ready to serialize the data on the next transmission (when CS goes low).
+% \end{itemize}
+
+% \subsubsection*{Serial-to-Parallel (S2P) for MOSI Reception}
+
+% The slave's \texttt{serial\_to\_parallel} module receives data from the Master:
+
+% \begin{itemize}[noitemsep]
+%     \item \textbf{Data Sampling}: On each inter\_clk edge where CS is active (ena = ~n\_cs = 1), the MOSI bit is sampled into the MSB of an internal register.
+%     \item \textbf{Bit Accumulation}: Bits shift right to lower positions, building the received byte LSB-to-MSB over 8 clock cycles.
+%     \item \textbf{Output}: The accumulated 8-bit value is available at data\_out (OUTPUT) after the 8th bit is received.
+% \end{itemize}
+
+% \subsubsection*{Parallel-to-Serial (P2S) for MISO Transmission}
+
+% The slave's \texttt{Parallel\_to\_serial} module transmits data to the Master:
+
+% \begin{itemize}[noitemsep]
+%     \item \textbf{Load Trigger}: The asynchronous LOAD signal captures the INPUT data into the shift register.
+%     \item \textbf{Bit Transmission}: On each inter\_clk edge where CS is active, the MSB of the register is output to MISO, and all bits shift left. The next bit rotates into the MSB position on the following clock edge.
+%     \item \textbf{MSB-First Order}: Data is transmitted MSB-first, ensuring consistent bit ordering with the Master's expectations.
+% \end{itemize}
+
+% \subsection{Data Path and Signal Flow}
+
+
+% \subsubsection*{Master Transmit Path}
+
+% \begin{enumerate}[noitemsep]
+%     \item INPUT (external) → P2S buffer (via M\_load)
+%     \item P2S buffer → MOSI line (8 bits, MSB-first)
+%     \item Each bit → CRC5 generator (simultaneous calculation)
+%     \item CRC5 output (5 bits) → MOSI line (cycles 8–12)
+% \end{enumerate}
+
+% \subsubsection*{Master Receive Path}
+
+% \begin{enumerate}[noitemsep]
+%     \item MISO line → S2P buffer (8 bits, MSB-first)
+%     \item MISO line → CRC5 checker (simultaneous verification)
+%     \item S2P buffer → OUTPUT (after 8 clock cycles)
+%     \item CRC5 checker → VALID signal (after 13 cycles)
+% \end{enumerate}
+
+% \subsubsection*{Slave Transmit Path}
+
+% \begin{enumerate}[noitemsep]
+%     \item INPUT (external) → P2S buffer (via asynchronous LOAD)
+%     \item P2S buffer → MISO line (8 bits, MSB-first, when CS active)
+% \end{enumerate}
+
+% \subsubsection*{Slave Receive Path}
+
+% \begin{enumerate}[noitemsep]
+%     \item MOSI line → S2P buffer (8 bits, MSB-first, when CS active)
+%     \item S2P buffer → OUTPUT (after 8 clock cycles)
+% \end{enumerate}
+
+% \subsection{Timing and Clock Phase Control}
+
+% \subsubsection*{CPOL and CPHA Configuration}
+
+% The module supports configurable SPI modes via CPOL and CPHA parameters:
+
+% \begin{itemize}[noitemsep]
+%     \item \textbf{CPOL (Clock Polarity)}: Determines the idle state of SCLK.
+%     \begin{itemize}[noitemsep]
+%         \item CPOL = 0: SCLK idles low.
+%         \item CPOL = 1: SCLK idles high.
+%     \end{itemize}
+%     \item \textbf{CPHA (Clock Phase)}: Determines whether data is sampled on the first or second SCLK edge.
+%     \begin{itemize}[noitemsep]
+%         \item CPHA = 0: Data is sampled on the first SCLK edge.
+%         \item CPHA = 1: Data is sampled on the second SCLK edge.
+%     \end{itemize}
+%     \item \textbf{CLK\_CTRL Parameter}: Derived as CLK\_CTRL = CPOL \textasciicircum{} CPHA, this parameter directly modifies the relationship between REFCLK and the internal sampling clocks, ensuring that both Master and Slave sample at consistent edges.
+% \end{itemize}
+
+% \subsubsection*{Synchronous vs. Asynchronous Operations}
+
+% \begin{itemize}[noitemsep]
+%     \item \textbf{Master}: All state machine transitions and internal operations are clocked by REFCLK (posedge-triggered), ensuring deterministic synchronous behavior.
+%     \item \textbf{Slave}: Data shifting and counter increments are driven by inter\_clk (the modified SCLK). The LOAD signal triggers asynchronous data capture, allowing immediate response to external events. The n\_rst signal provides asynchronous reset capability.
+% \end{itemize}
+
+% \subsection{Error Detection and Data Validity}
+
+% \subsubsection*{CRC5 Polynomial}
+
+% The CRC5 module implements a standard 5-bit polynomial-based error detection scheme:
+
+% \begin{itemize}[noitemsep]
+%     \item \textbf{Feedback Logic}: For each transmitted bit, a feedback signal is computed as: feedback = serial\_in \textasciicircum{} crc\_out[4]. This feedback is fed back into the polynomial.
+%     \item \textbf{Shift Register Update}: The CRC register shifts on each clock edge, updating as:
+%     \begin{itemize}[noitemsep]
+%         \item crc\_out[0] ← feedback
+%         \item crc\_out[1] ← crc\_out[0]
+%         \item crc\_out[2] ← crc\_out[1] \textasciicircum{} feedback
+%         \item crc\_out[3] ← crc\_out[2]
+%         \item crc\_out[4] ← crc\_out[3]
+%     \end{itemize}
+%     \item \textbf{Receiver Validation}: At the receiver (Master), the CRC5 checker independently computes the same polynomial. If the received data and CRC are correct, the final CRC value equals zero, and data\_valid is asserted.
+% \end{itemize}
+
+% \subsubsection*{VALID Signal Generation}
+
+% \begin{itemize}[noitemsep]
+%     \item During IDLE and COMPLETE states, VALID defaults to 1'b1 (no transmission in progress).
+%     \item During TRANSFER, VALID is updated at cycle 12 (end of CRC phase) to reflect the checker output (t\_valid).
+%     \item If CRC verification fails, VALID = 1'b0, alerting the external system to discard the received data or request retransmission.
+% \end{itemize}
+
+
+
+\section{Internal Implementation}
+
+Phần này trình bày chi tiết về kiến trúc phần cứng nội bộ, sơ đồ phân cấp các module (Module Hierarchy), thiết kế máy trạng thái thuật toán (FSM), và cơ chế dịch chuyển dữ liệu đồng bộ của hệ thống giao tiếp SPI tích hợp khối kiểm tra lỗi CRC5.
+
+\subsection{Sơ đồ phân cấp hệ thống (Module Hierarchy)}
+Hệ thống được thiết kế theo mô hình hướng cấu trúc (Structural Modeling), chia nhỏ các tác vụ phức tạp thành các khối chức năng cơ bản để tối ưu hóa khả năng tái sử dụng và đóng gói phần cứng. Sơ đồ phân cấp của toàn bộ thiết kế hệ thống như sau:
+\begin{itemize}
+    \item \textbf{SPI\_Master\_CRC} (Khối điều khiển Master tích hợp kiểm tra lỗi) 
+    \begin{itemize}
+        \item \texttt{Buf\_P2S}: Thanh ghi dịch chuyển đổi dữ liệu từ song song sang nối tiếp (Parallel-to-Serial Buffer) .
+        \item \texttt{Buf\_S2P}: Thanh ghi dịch chuyển đổi dữ liệu từ nối tiếp sang song song (Serial-to-Parallel Buffer) .
+        \item \texttt{crc5}: Khối tính toán mã kiểm tra dư thừa tuần hoàn 5-bit cho đường truyền dữ liệu phát đi (\texttt{MOSI}) .
+        \item \texttt{crc5\_checker}: Khối kiểm tra tính toàn vẹn của mã CRC5 nhận về từ đường \texttt{MISO} .
+    \end{itemize}
+    \item \textbf{SPI\_Slave\_CRC} (Khối ngoại vi Slave tích hợp kiểm tra lỗi) 
+    \begin{itemize}
+        \item \texttt{serial\_to\_parallel}: Khối dịch nhận dữ liệu nối tiếp từ \texttt{MOSI} chuyển thành dữ liệu song song .
+        \item \texttt{Parallel\_to\_serial}: Khối dịch phát dữ liệu song song thành nối tiếp ra chân \texttt{MISO} .
+        \item \texttt{crc5 (tx\_crc\_calc)}: Khối tính toán CRC5 dựa trên dữ liệu phát đi của Slave .
+        \item \texttt{crc5\_checker (rx\_crc\_check)}: Khối giải mã và kiểm tra lỗi chuỗi dữ liệu nhận từ Master .
+    \end{itemize}
+\end{itemize}
+
+\subsection{Hiện thực hóa khối SPI Master CRC}
+
+\subsubsection{Cơ chế dịch dữ liệu (Shift Registers)}
+Khối \texttt{Buf\_P2S} chịu trách nhiệm lưu trữ dữ liệu từ bus \texttt{INPUT} khi có tín hiệu kích hoạt \texttt{load} . Quá trình dịch phải được đồng bộ theo xung cạnh của đường truyền. Tại mỗi chu kỳ dịch (khi tín hiệu \texttt{ena} tích cực), bit có trọng số thấp nhất nằm ở vị trí \texttt{buffer[0]} sẽ được đẩy trực tiếp ra ngõ ra \texttt{Output} . Sau đó, toàn bộ dữ liệu nội bộ trong mảng được dịch chuyển dịch phải :
+\begin{equation}
+    \texttt{buffer[i-1]} \leftarrow \texttt{buffer[i]} \quad (\text{với } i = N-1 \text{ giảm về } 1) 
+\end{equation}
+Đồng thời, bit trống ở vị trí cao nhất \texttt{buffer[N-1]} sẽ tự động được xóa về giá trị \texttt{1'b0} để giải phóng thanh ghi (Flush buffer) . Ngược lại, khối \texttt{Buf\_S2P} thực hiện quá trình bắt mẫu nối tiếp từ chân \texttt{MISO}. Mỗi khi xung dịch \texttt{ena} bật, bit mới từ ngõ vào sẽ được chốt vào vị trí \texttt{buffer[N-1]} và đẩy các bit cũ hơn xuống vị trí thấp hơn .
+
+\subsubsection{Thiết kế Máy trạng thái điều khiển (FSM)}
+Khối điều khiển trung tâm của Master hoạt động dựa trên một máy trạng thái FSM đồng bộ theo sườn lên của xung nhịp hệ thống \texttt{REFCLK} . FSM bao gồm 4 trạng thái chính :
+\begin{enumerate}
+    \item \textbf{IDLE (2'b00):} Trạng thái nghỉ. Tại đây, cờ báo \texttt{READY} và cờ \texttt{VALID} được kéo lên mức cao . Hệ thống liên tục giám sát tín hiệu điều khiển \texttt{CNTL} từ bộ vi xử lý để quyết định chuyển trạng thái . Các khối tính toán CRC liên tục bị giữ ở trạng thái thiết lập lại (\texttt{reset\_crc = 1'b1}) .
+    \item \textbf{LOAD\_DT (2'b01):} Trạng thái nạp dữ liệu. Tín hiệu điều khiển nội bộ \texttt{M\_load} được kích hoạt để đưa byte dữ liệu cần truyền từ bus \texttt{INPUT} vào thanh ghi dịch .
+    \item \textbf{LOAD\_CS (2'b10):} Trạng thái cấu hình thiết bị tớ (Slave Select). Tại trạng thái này, giá trị lưu trong thanh ghi đệm đầu vào sẽ được giải mã để hạ chân chọn chip tương ứng xuống mức thấp. Hệ thống thực hiện biểu thức logic :
+    \begin{lstlisting}[language=Verilog]
+SS <= (buf_input < Number_Slave) ? {Number_Slave{1'b1}} & ~(1 << buf_input) : {Number_Slave{1'b1}}; 
+    \end{lstlisting}
+    Nếu địa chỉ nằm ngoài vùng quản lý của số lượng Slave cấu hình, toàn bộ bus \texttt{SS} giữ nguyên ở mức logic cao để đảm bảo an toàn phần cứng .
+    \item \textbf{TRANSFER (2'b11):} Trạng thái truyền thông dữ liệu. Cờ \texttt{READY} hạ xuống mức thấp để khóa các tác vụ ghi từ CPU . Bộ đếm \texttt{count} kích hoạt để đếm số bit dịch truyền trên đường truyền .
+\end{enumerate}
+
+\begin{table}[h!]
+\centering
+\caption{Luật chuyển trạng thái tiếp theo (Next State Logic) dựa trên CNTL}
+\label{tab:fsm_master}
+\begin{tabular}{|c|c|c|}
+\hline
+\textbf{Trạng thái hiện tại} & \textbf{Điều kiện ngõ vào CNTL} & \textbf{Trạng thái kế tiếp} \\ \hline
+\texttt{IDLE} & \texttt{2'b01} & \texttt{LOAD\_DT}  \\ \cline{2-3} 
+ & \texttt{2'b10} & \texttt{LOAD\_CS}  \\ \cline{2-3} 
+ & \texttt{2'b11} & \texttt{TRANSFER}  \\ \hline
+\texttt{LOAD\_DT} & \texttt{2'b11} & \texttt{TRANSFER}  \\ \cline{2-3} 
+ & \texttt{2'b10} & \texttt{LOAD\_CS}  \\ \hline
+\texttt{TRANSFER} & \texttt{count == Frame\_Size + 4} \& \texttt{CNTL == 3} & \texttt{TRANSFER}  \\ \cline{2-3} 
+ & \texttt{count == Frame\_Size + 4} \& \texttt{CNTL != 3} & \texttt{IDLE / LOAD\_DT / LOAD\_CS}  \\ \hline
+\end{tabular}
+\end{table}
+
+\subsubsection{Cơ chế tích hợp và đóng gói khung truyền CRC5}
+Trong suốt chu kỳ truyền trạng thái \texttt{TRANSFER}, tổng chiều dài của khung truyền được mở rộng lên thành $8 \text{ bits data} + 5 \text{ bits CRC} = 13 \text{ nhịp}$ (tương ứng với giá trị bộ đếm chạy từ \texttt{0} đến \texttt{Frame\_Size + 4}) . 
+\begin{itemize}
+    \item Khi bộ đếm \texttt{count < Frame\_Size} (8 nhịp đầu): Đường tín hiệu \texttt{MOSI} nhận dữ liệu trực tiếp từ ngõ ra của thanh ghi dịch \texttt{Buf\_P2S} . Đồng thời khối \texttt{crc5} bật tín hiệu cho phép (\texttt{M\_ena = 1'b1}) để tính toán trực tiếp chuỗi bit đang truyền ra .
+    \item Khi bộ đếm \texttt{count} đạt từ \texttt{Frame\_Size} đến \texttt{Frame\_Size + 4} (5 nhịp cuối): Khối Master ngắt đường truyền dữ liệu thuần, chuyển mạch đa hợp (Multiplexing) để đẩy lần lượt từng bit của mảng kết quả tính toán CRC nội bộ (\texttt{crc\_out}) ra chân \texttt{MOSI} theo thứ tự :
+    \begin{equation}
+        \texttt{MOSI} \leftarrow \texttt{crc\_out[Frame\_Size + 4 - count]} 
+    \end{equation}
+    \item Chân tạo xung đồng bộ \texttt{SCLK} được cấp phát trực tiếp bằng nguồn xung hệ thống \texttt{REFCLK} trong suốt chu kỳ truyền và tự động ngắt về trạng thái tĩnh logic thấp ngay khi hoàn tất nhịp thứ 13 .
+\end{itemize}
+
+\subsection{Hiện thực hóa khối SPI Slave CRC}
+
+Khác biệt với khối Master điều khiển bằng cấu trúc FSM phức tạp, khối \texttt{SPI\_Slave\_CRC} được tối ưu hóa tài nguyên phần cứng bằng cách sử dụng cấu trúc điều khiển định thời dựa trên bộ đếm vòng (Counter-driven architecture) .
+
+\subsubsection{Xử lý phân tách miền xung nhịp nội bộ (Clock Control)}
+Để hỗ trợ linh hoạt các cấu hình phân cực xung nhịp (CPOL) và pha xung nhịp (CPHA) khác nhau của chuẩn SPI, hệ thống tích hợp mạch luận lý XOR để tạo ra đường xung nhịp điều khiển nội bộ \texttt{inter\_clk} :
+\begin{equation}
+    \texttt{inter\_clk} = \texttt{sclk} \oplus \texttt{CLK\_CTRL} \quad (\text{với } \texttt{CLK\_CTRL} = \texttt{CPOL} \oplus \texttt{CPHA}) 
+\end{equation}
+Mọi tác vụ ghi nhận dữ liệu nối tiếp từ \texttt{MOSI} và dịch chuyển dữ liệu ra \texttt{MISO} của Slave đều được xử lý đồng bộ theo sườn lên của tín hiệu \texttt{inter\_clk} này, đảm bảo tính toàn vẹn dữ liệu tại các điều kiện biên .
+
+\subsubsection{Cơ chế đếm phân đoạn và điều khiển luồng dữ liệu}
+Mạch chứa một bộ đếm nội bộ \texttt{counter} kích thước 4-bit . Bộ đếm này tự động giải phóng về \texttt{0} khi hệ thống bị đặt lại (\texttt{n\_rst == 1'b0}) hoặc khi chân chọn chip bị ngắt (\texttt{n\_cs == 1'b1}) . Khi chân \texttt{n\_cs} tích cực ở mức thấp, bộ đếm tăng tiến liên tục sau mỗi chu kỳ của xung nhịp \texttt{inter\_clk} từ nhịp 0 đến nhịp 13 . 
+
+Hệ thống sử dụng giá trị của bộ đếm này để phân đoạn tác vụ xử lý phần cứng thông qua đường dây cho phép dịch dữ liệu \texttt{shift\_ena} :
+\begin{equation}
+    \texttt{shift\_ena} = (\sim \texttt{n\_cs}) \ \&\& \ (\texttt{counter} < n) 
+\end{equation}
+Biểu thức này giới hạn các khối dịch chuyển song song/nối tiếp (\texttt{MOSI\_Block} và \texttt{MISO\_Block}) chỉ được phép hoạt động trong đúng 8 chu kỳ xung nhịp đầu tiên của phiên truyền dữ liệu . Nhờ đó, dữ liệu thô (Raw data) được bảo vệ và cô lập hoàn toàn khỏi phân đoạn truyền mã bảo vệ lỗi CRC phía sau.
+
+\subsubsection{Điều khiển cổng trở kháng cao và đa hợp ngõ ra MISO}
+Để đáp ứng kiến trúc kết nối nhiều thiết bị tớ trên cùng một tuyến bus chung (Multi-slave bus topology), ngõ ra \texttt{MISO} của Slave được thiết kế tích hợp mạch điều khiển cổng ba trạng thái (Tri-state buffer). Mạch luận lý đa hợp của ngõ ra được cấu hình như sau :
+\begin{equation}
+    \texttt{MISO} = 
+    \begin{cases} 
+        \texttt{1'bz} & \text{nếu } \texttt{n\_cs} = 1'b1 \quad (\text{Ngắt khỏi bus})  \\
+        \texttt{tx\_miso\_data} & \text{nếu } \texttt{counter} < n \text{ hoặc } \texttt{counter} = 13  \\
+        \texttt{tx\_crc\_out[(total\_len - 1) - counter]} & \text{nếu } n \le \texttt{counter} < 13 
+    \end{cases}
+\end{equation}
+Cơ chế này giúp Slave tự động giải phóng đường truyền bus về trạng thái trở kháng cao khi không được lựa chọn . Trong chu kỳ hoạt động, khối sẽ phát dữ liệu thô từ thanh ghi dịch trong 8 nhịp đầu, và tự động chuyển mạch để phát các bit từ thanh ghi chứa mã kết quả CRC5 ở 5 nhịp tiếp theo để Master thu thập .
+
+\subsection{Khối xử lý toán học toán tử CRC5}
+Thuật toán kiểm tra lỗi sử dụng cấu trúc thanh ghi dịch phản hồi tuyến tính (LFSR). Sơ đồ mạch phần cứng hiện thực hóa đa thức kiểm tra lỗi CRC5 tiêu chuẩn dựa trên cấu trúc các khối gán đồng bộ tuần tự nối tiếp :
+\begin{lstlisting}[language=Verilog]
+always @(posedge clk or posedge reset) begin
+    if (reset) begin
+        crc_out <= 5'b00000; 
+    end else if (enable) begin
+        crc_out[0] <= feedback; 
+        crc_out[1] <= crc_out[0]; 
+        crc_out[2] <= crc_out[1] ^ feedback; 
+        crc_out[3] <= crc_out[2]; 
+        crc_out[4] <= crc_out[3]; 
+    end
+end
+\end{lstlisting}
+Trong đó biến phản hồi nội bộ được tính toán tức thời bằng cổng logic XOR giữa bit đầu vào nối tiếp và bit cao nhất hiện tại của thanh ghi dịch: $\texttt{feedback} = \texttt{serial\_in} \oplus \texttt{crc\_out[4]}$ . 
+
+Khối kiểm tra lỗi \texttt{crc5\_checker} liên tục nạp chuỗi bit dữ liệu nối tiếp nhận được vào kiến trúc LFSR này . Đến chu kỳ kiểm tra cuối cùng, nếu chuỗi nhận được hoàn toàn trùng khớp logic và không phát sinh lỗi đường truyền, tất cả các thanh ghi nội bộ trong mạng LFSR sẽ tự triệt tiêu về giá trị \texttt{0} . Tín hiệu báo dữ liệu hợp lệ \texttt{data\_valid} được tính toán nhanh bằng toán tử thu gọn NOR mạng thanh ghi :
+\begin{equation}
+    \texttt{data\_valid} = \sim(\text{OR reduction of } \texttt{current\_crc}) 
+\end{equation}
+Tín hiệu này lập tức chuyển lên mức logic cao (\texttt{1'b1}) để báo hiệu cho tầng liên kết dữ liệu phía trên biết dữ liệu nhận về hoàn toàn tin cậy .
