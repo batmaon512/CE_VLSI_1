@@ -1,0 +1,47 @@
+\documentclass[twoside, final]{hcmut_report}
+
+% Packages for TikZ drawing
+\usepackage{tikz}
+\usepackage{circuitikz} % For electrical circuits
+\usepackage{float}
+\usepackage{enumitem}
+\usetikzlibrary{shapes.geometric, arrows, positioning, patterns, decorations.pathmorphing}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+
+% Configuration
+\newcommand{\var}[1]{\textbf{#1}}
+\upperuniname{VIETNAM NATIONAL UNIVERSITY HO CHI MINH CITY}
+\uniname{HO CHI MINH CITY UNIVERSITY OF TECHNOLOGY}
+\deptname{FACULTY OF COMPUTER SCIENCE AND ENGINEERING}
+
+\coursename{\LARGE Logic Design \\ \large (CO3097)}
+\reporttype{\Large Report Lab 1}
+\title{\Large Ring Flasher Design and Simulation}
+
+\advisor{
+Tôn Huỳnh Long
+}
+\student{
+   Nguyễn Chí Thanh,  2313078 
+   Nguyễn Việt Hoàng, 2311066
+   Lê Đức Tài,        2312995
+   Mai Xuân Nhựt,     2312549
+}
+\setlength{\parindent}{2em}
+\begin{document}
+\coverpage
+\pagestyle{empty}
+\tableofcontents
+\pagestyle{fancy}
+\pagebreak
+
+\include{contents/interface}
+\include{contents/FSM}
+\include{contents/func_implementation}
+\include{contents/inter_implementation}
+\include{contents/simulation}
+\include{contents/result_summary}
+
+\end{document}
