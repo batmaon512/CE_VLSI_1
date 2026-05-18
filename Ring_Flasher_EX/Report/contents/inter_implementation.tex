@@ -59,8 +59,6 @@ NOR Reduction Gate         & input   & Input  & 16-bit & LED brightness vector u
                            & off\_all & Output & 1-bit & Goes high when all LED brightness levels are zero. \\
 \bottomrule
 \end{tabular}
-
-
 \subsection{State machine}
 
 \begin{figure}[H]
@@ -91,6 +89,26 @@ The finite state machine is implemented in the \texttt{Control} module with the 
 	\item LED position registers: \texttt{cur\_pos}, \texttt{next\_pos}.
 \end{itemize}
 
+
+
+\subsection*{Table 4: Variable Name of State Machine}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{p{2.6cm} p{2.2cm} p{3.6cm} p{6.0cm}}
+\toprule
+\textbf{Variable Name} & \textbf{Type} & \textbf{Width} & \textbf{Description} \\
+\midrule
+\texttt{State} & Reg & 2-bit & Current FSM state register. \\
+\texttt{NextState} & Reg & 2-bit & Next-state combinational register. \\
+\texttt{Counter} & Reg & $\log_2(NumCW+NumACW)$ + 1 & Counts total steps in CW and ACW phases. \\
+\texttt{NextCounter} & Reg & $\log_2(NumCW+NumACW)$ + 1 & Next value of step counter. \\
+\texttt{cur\_pos} & Reg & $\log_2(NumLed)$ + 1 & Current LED pointer position. \\
+\texttt{next\_pos} & Reg & $\log_2(NumLed)$ + 1 & Next LED pointer position. \\
+\texttt{cur} & Wire (output) & $\log_2(NumLed)$ + 1 & Exported LED index to datapath. \\
+\texttt{ena\_div} & Reg (output) & 1-bit & Enable signal for clock divider. \\
+\texttt{n\_rst\_div} & Reg (output) & 1-bit & Active-low reset signal for divider. \\
+\bottomrule
+\end{tabular}
+\\
 The signal \texttt{cur} provides the current LED index to the datapath. The control outputs \texttt{ena\_div} and \texttt{n\_rst\_div} are used to enable and reset the step-timer clock divider.
 
 \noindent\textbf{State-by-State Behavior}
@@ -104,4 +122,15 @@ The signal \texttt{cur} provides the current LED index to the datapath. The cont
 	\item \textbf{OFF\_STATE}: No new LED position is injected (position is forced to an invalid index). The datapath keeps decreasing LED intensity until all LEDs are off. When \texttt{off\_all = 1}, the FSM returns to \texttt{IDLE\_STATE}.
 \end{itemize}
 
-
+\subsection*{Table 3: State Name of State Machine}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{lll p{8cm}}
+\toprule
+\textbf{State Name} & \textbf{Parameter} & \textbf{Code} & \textbf{Description} \\
+\midrule
+IDLE & \texttt{IDLE\_STATE} & 2'd0 & Wait state. The FSM stays here until \texttt{rep = 1}. \\
+CW & \texttt{CW\_STATE} & 2'd1 & Clockwise running state. LED position increments each step. \\
+ACW & \texttt{ACW\_STATE} & 2'd2 & Anti-clockwise running state. LED position decrements each step. \\
+OFF & \texttt{OFF\_STATE} & 2'd3 & Fade-out state. Waits until all LEDs are fully off before returning to IDLE. \\
+\bottomrule
+\end{tabular}
