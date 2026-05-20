@@ -10,6 +10,10 @@
 *.synctex.gz
 *.pdf
 
+# Allow PDFs in report graphics
+!Ring_Flasher_EX/Report/graphics/**/*.pdf
+!SPI_Module/Report/graphics/**/*.pdf
+
 # Build outputs
 build/
 output/
