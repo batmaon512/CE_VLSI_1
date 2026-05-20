@@ -1,79 +1,125 @@
-\section{Synthesis and Implementation Results}
+\section{Synthesis and Results Summary}
 
-\subsection{Vivado Implementation Summary}
+\subsection{Cadence Synthesis Flow}
 
-The Ring Flasher design was synthesized and implemented in Vivado on an Artix-7 FPGA. The post-implementation results are summarized below for an 8 ns clock period (125 MHz).
+The \texttt{SPI\_Top} design was synthesized using Cadence Genus. The top-level architecture connects one master module and two slave modules into a single system-level block, together with the supporting serial/parallel buffers and CRC logic.
+
+After synthesis, the key generated files are:
+\begin{itemize}
+    \item Netlist: \texttt{outputs??/\${DESIGN}\_m.v} \; (for example, \texttt{bound\_flasher\_m.v})
+    \item Area report: \texttt{reports??/final\_area.rpt}
+    \item QoR report: \texttt{reports??/final\_qor.rpt}
+    \item Timing report: \texttt{reports??/final\_time.rpt}
+\end{itemize}
+\subsection{Netlist Output}
+
+The synthesized netlist describes the structural implementation of \texttt{SPI\_Top} after logic optimization. It includes the master block, slave blocks, CRC logic, and the required multiplexing and control paths. This file is the main reference for the final gate-level structure.
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=1\linewidth]{graphics/result2.png}
-    \caption{Post-Implementation Timing Summary}
+    % [Insert netlist screenshot or file browser view here]
+    \includegraphics[width=1\linewidth]{graphics/final_.png}
+    \caption{Generated netlist file after synthesis}
+    \label{fig:netlist_output}
 \end{figure}
+
+\subsection{Area Report}
+
+The area report shows the compactness of the synthesized design. According to \texttt{final\_area.rpt}, the top module occupies 246 cells with a total area of 1231.254 $\mu m^2$.
+
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{lrr}
+\toprule
+\textbf{Metric} & \textbf{Value} & \textbf{Unit} \\
+\midrule
+Cell Count & 246 & cells \\
+Cell Area & 933.660 & $\mu m^2$ \\
+Net Area & 297.594 & $\mu m^2$ \\
+Total Area & 1231.254 & $\mu m^2$ \\
+\bottomrule
+\end{tabular}
+\caption{Area summary extracted from \texttt{final\_area.rpt}}
+\end{table}
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=1\linewidth]{graphics/result1.png}
-    \caption{Post-Implementation Power Summary and Resource Utilization}
+    % [Insert area report screenshot here]
+    \includegraphics[width=1\linewidth]{graphics/final_area.png}
+    \caption{Cadence area report for SPI\_Top}
+    \label{fig:area_report}
 \end{figure}
 
-\subsection{Resource Utilization}
+Instance breakdown from the QoR summary:
+\begin{itemize}
+    \item Leaf Instance Count: 246
+    \item Sequential Instance Count: 84
+    \item Combinational Instance Count: 162
+    \item Hierarchical Instance Count: 0
+\end{itemize}
 
-The design uses very few FPGA resources:
+\subsection{QoR Report}
 
-\begin{table}[H]
-\centering
-\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{lrrrr}
-\toprule
-\textbf{Resource} & \textbf{Used} & \textbf{Available} & \textbf{Utilization (\%)} \\
-\midrule
-LUT  & 153 & 53,200  & 0.29\% \\
-FF   & 139 & 106,400 & 0.13\% \\
-IO   & 19  & 125     & 15.20\% \\
-BUFG & 2   & 32      & 6.25\% \\
-\bottomrule
-\end{tabular}
-\caption{Post-Implementation Resource Utilization}
-\end{table}
-
-\subsection{Power Analysis}
-
-Vivado estimates the total on-chip power at 0.117 W, with a junction temperature of 26.3 \textdegree C and a thermal margin of 58.7 \textdegree C.
+The QoR report summarizes the overall synthesis quality. For this design, the REFCLK group shows no violating paths, and the critical slack is positive. The design therefore meets timing at the synthesized operating point.
 
 \begin{table}[H]
 \centering
 \renewcommand{\arraystretch}{1.2}
-\begin{tabular}{ll}
+\begin{tabular}{lcc}
 \toprule
-\textbf{Metric} & \textbf{Value} \\
+\textbf{Group} & \textbf{Slack (ns)} & \textbf{Violating Paths} \\
 \midrule
-Total On-Chip Power & 0.117 W \\
-Junction Temperature & 26.3 \textdegree C \\
-Thermal Margin & 58.7 \textdegree C \\
-Effective $\theta_{JA}$ & 11.5 \textdegree C/W \\
+REFCLK & 3384.2 & 0 \\
+default & No paths & 0 \\
 \bottomrule
 \end{tabular}
-\caption{Power Summary}
+\caption{QoR summary extracted from \texttt{final\_qor.rpt}}
 \end{table}
 
-\subsection{Timing Analysis}
+\begin{figure}[H]
+    \centering
+    % [Insert QoR report screenshot here]
+    \includegraphics[width=1\linewidth]{graphics/final_qor_1.png}
+    \includegraphics[width=1\linewidth]{graphics/final_qor_2.png}
+    \caption{Cadence QoR report for SPI\_Top}
+    \label{fig:qor_report}
+\end{figure}
 
-The design meets all timing constraints at an 8 ns clock period. The worst setup slack is 4.986 ns, the worst hold slack is 0.128 ns, and the worst pulse width slack is 3.500 ns.
+\subsection{Timing Report}
+
+The timing report in \texttt{final\_time.rpt} confirms that the major internal paths meet setup timing. The most critical paths are related to the master buffer registers, CRC logic, and the slave transmit paths. All reported setup checks are marked \texttt{MET}.
 
 \begin{table}[H]
 \centering
 \renewcommand{\arraystretch}{1.2}
-\begin{tabular}{lcccc}
+\begin{tabular}{lrr}
 \toprule
-\textbf{Metric} & \textbf{Setup} & \textbf{Hold} & \textbf{Pulse Width} \\
+\textbf{Timing Item} & \textbf{Value} & \textbf{Status} \\
 \midrule
-Worst Slack (ns) & 4.986 & 0.128 & 3.500 \\
-Failing Endpoints & 0 & 0 & 0 \\
+Worst setup slack & 3384 ps & MET \\
+Worst observed late external delay & 7210 ps & MET \\
+Total violating paths & 0 & PASS \\
 \bottomrule
 \end{tabular}
-\caption{Timing Summary}
+\caption{Timing summary extracted from \texttt{final\_time.rpt}}
 \end{table}
+
+\begin{figure}[H]
+    \centering
+    % [Insert timing report screenshot here]
+    \includegraphics[width=1\linewidth]{graphics/final_time.png}
+    \caption{Cadence timing report for SPI\_Top}
+    \label{fig:timing_report}
+\end{figure}
 
 \subsection{Conclusion}
 
-The implementation is compact, power-efficient, and fully meets timing requirements. With all constraints satisfied and low resource usage, the design is suitable for deployment and further extension.
+The Cadence synthesis results confirm that the \texttt{SPI\_Top} design is structurally compact and timing-clean. The generated netlist, area report, QoR report, and timing report all indicate that the design is ready for the next verification or implementation stage.
+
+\begin{itemize}
+    \item The synthesized netlist contains the expected master-slave system structure.
+    \item The area result remains compact at 1231.254 $\mu m^2$.
+    \item The QoR report shows positive slack and no violating paths.
+    \item The timing report marks all key setup checks as \texttt{MET}.
+\end{itemize}
