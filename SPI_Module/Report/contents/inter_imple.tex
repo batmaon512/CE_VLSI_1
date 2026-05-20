@@ -1,0 +1,96 @@
+\section{Internal Implementation}
+
+This section elaborates on the internal hardware architecture, the hierarchical module decomposition, the algorithmic Finite State Machine (FSM) design, and the synchronous data shifting mechanisms of the SPI communication system integrated with a CRC5 error-checking block.
+
+\subsection{System Hierarchy and Structural Modeling}
+The hardware system is designed using a structural modeling approach, partitioning complex data link operations into fundamental, reusable functional blocks. The hierarchical composition of the design is as follows:
+\begin{itemize}
+    \item \textbf{\texttt{SPI\_Master\_CRC}} (Master Controller with Error Checking)
+          \begin{itemize}
+              \item \texttt{Buf\_P2S}: Parallel-to-Serial buffer for transmission mapping.
+              \item \texttt{Buf\_S2P}: Serial-to-Parallel buffer for reception mapping.
+              \item \texttt{crc5}: Computes the 5-bit Cyclic Redundancy Check (CRC) checksum for the outgoing \texttt{MOSI} data stream.
+              \item \texttt{crc5\_checker}: Validates the integrity of the incoming data on the \texttt{MISO} line against transmission errors.
+          \end{itemize}
+    \item \textbf{\texttt{SPI\_Slave\_CRC}} (Peripheral Module with Error Checking)
+          \begin{itemize}
+              \item \texttt{serial\_to\_parallel}: Deserializes incoming \texttt{MOSI} bitstreams into parallel byte structures.
+              \item \texttt{Parallel\_to\_serial}: Serializes the outgoing payload onto the \texttt{MISO} interface.
+              \item \texttt{crc5}: Evaluates the CRC5 checksum for the Slave's transmitted data.
+              \item \texttt{crc5\_checker}: Decodes and verifies the payload received from the Master.
+          \end{itemize}
+\end{itemize}
+
+\subsection{SPI Master Module Implementation}
+
+\subsubsection{Data Shifting Mechanism}
+The \texttt{Buf\_P2S} module is responsible for capturing parallel data from the \texttt{INPUT} bus upon the assertion of the \texttt{load} signal. The shifting process is synchronized with the transmission clock edges. During each active shift cycle (\texttt{ena} == 1), the least significant bit is pushed directly to the \texttt{Output} pin. Simultaneously, the internal array is right-shifted:
+\begin{equation}
+    \texttt{buffer[i-1]} \leftarrow \texttt{buffer[i]} \quad (\text{for } i = N-1 \text{ down to } 1)
+\end{equation}
+The most significant bit, \texttt{buffer[N-1]}, is subsequently flushed to \texttt{1'b0} to clear the register. Conversely, the \texttt{Buf\_S2P} logic continuously samples the \texttt{MISO} line, shifting the most recent bit into \texttt{buffer[N-1]} and propagating older bits downwards.
+
+\subsubsection{Finite State Machine (FSM) Architecture}
+The core control unit of the Master operates as an FSM synchronized to the rising edge of the system reference clock, \texttt{REFCLK}. The machine traverses four primary operational states:
+\begin{enumerate}
+    \item \textbf{IDLE (\texttt{2'b00}):} The resting state. The \texttt{READY} and \texttt{VALID} flags are maintained HIGH. The system actively polls the \texttt{CNTL} bus from the host CPU to determine the next state transition, while holding the CRC computing engines in a reset state.
+    \item \textbf{LOAD\_DT (\texttt{2'b01}):} The data loading state. The internal \texttt{M\_load} control signal is asserted to latch the transmission byte from the \texttt{INPUT} bus into the shift register.
+    \item \textbf{LOAD\_CS (\texttt{2'b10}):} The peripheral configuration state. The value stored in the input buffer is decoded to assert the corresponding active-LOW Slave Select (\texttt{SS}) line using the following logic:
+          \begin{lstlisting}[language=Verilog]
+SS <= (buf_input < Number_Slave) ? {Number_Slave{1'b1}} & ~(1 << buf_input) 
+                                 : {Number_Slave{1'b1}};
+\end{lstlisting}
+    \item \textbf{TRANSFER (\texttt{2'b11}):} The active communication state. The \texttt{READY} flag is pulled LOW, isolating the system from external write attempts, and the internal \texttt{count} variable begins tracking the shifted bits.
+\end{enumerate}
+
+\subsubsection{Frame Multiplexing and CRC Integration}
+During the \texttt{TRANSFER} state, the communication frame is extended to 13 clock cycles (8 bits payload + 5 bits CRC), corresponding to the \texttt{count} variable incrementing from 0 to \texttt{Frame\_Size + 4}.
+\begin{itemize}
+    \item \textbf{Data Phase (\texttt{count < Frame\_Size}):} The \texttt{MOSI} line is driven directly by the output of the \texttt{Buf\_P2S} register. The \texttt{crc5} module actively calculates the checksum of the bitstream being transmitted.
+    \item \textbf{CRC Phase (\texttt{count} $\ge$ \texttt{Frame\_Size}):} The Master shifts its multiplexer to directly output the resultant bits from the internal CRC calculation array (\texttt{crc\_out}):
+          \begin{equation}
+              \texttt{MOSI} \leftarrow \texttt{crc\_out[Frame\_Size + 4 - count]}
+          \end{equation}
+\end{itemize}
+
+\subsection{SPI Slave Module Implementation}
+Unlike the Master, which relies on a complex FSM structure, the \texttt{SPI\_Slave\_CRC} module is architecturally optimized around a counter-driven execution model.
+
+\subsubsection{Clock Domain Synchronization}
+To natively support varying Clock Polarity (CPOL) and Clock Phase (CPHA) configurations, the module incorporates XOR-based combinational logic to synthesize the internal execution clock (\texttt{inter\_clk}):
+\begin{equation}
+    \texttt{inter\_clk} = \texttt{sclk} \oplus \texttt{CLK\_CTRL}
+\end{equation}
+where $\texttt{CLK\_CTRL} = \texttt{CPOL} \oplus \texttt{CPAH}$. All serial capture and shift-out operations are executed strictly on the rising edge of \texttt{inter\_clk}, ensuring robust data boundary alignments.
+
+\subsubsection{Counter-Driven Logic and Tri-State Output}
+The module maintains an internal 4-bit \texttt{counter}. This counter evaluates incoming edges sequentially from 0 to 13 as long as the chip select (\texttt{n\_cs}) is asserted LOW. Data shifting arrays are explicitly enabled only during the first 8 payload cycles.
+
+Furthermore, to accommodate multi-slave bus topologies, the \texttt{MISO} output is guarded by a tri-state multiplexer:
+\begin{equation}
+    \texttt{MISO} =
+    \begin{cases}
+        \texttt{1'bz}              & \text{if } \texttt{n\_cs} = 1'b1                 \\
+        \texttt{tx\_miso\_data}    & \text{if } \texttt{counter} < Frame\_Size        \\
+        \texttt{tx\_crc\_out[...]} & \text{if } Frame\_Size \le \texttt{counter} < 13
+    \end{cases}
+\end{equation}
+This effectively floats the bus when the Slave is dormant, avoiding electrical conflicts.
+
+\subsection{Mathematical Operator: CRC5 Implementation}
+The error detection mechanism is realized via a Linear Feedback Shift Register (LFSR). The combinational logic for the polynomial feedback operates synchronously:
+\begin{lstlisting}[language=Verilog]
+assign feedback = serial_in ^ crc_out[4];
+always @(posedge clk or posedge reset) begin
+    if (reset) begin
+        crc_out <= 5'b00000;
+    end else if (enable) begin
+        crc_out[0] <= feedback;
+        crc_out[1] <= crc_out[0];
+        crc_out[2] <= crc_out[1] ^ feedback;
+        crc_out[3] <= crc_out[2];
+        crc_out[4] <= crc_out[3];
+    end
+end
+\end{lstlisting}
+The verifier module, \texttt{crc5\_checker}, streams the received serial bits through an identical LFSR framework. If the payload is uncorrupted, the residual value in the shift registers will evaluate to exactly zero at the end of the 13th cycle. This state is detected via a NOR reduction over the register array, immediately asserting the \texttt{data\_valid} flag to certify the integrity of the transaction.
