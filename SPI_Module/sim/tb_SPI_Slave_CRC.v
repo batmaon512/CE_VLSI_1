@@ -1,161 +1,325 @@
 `timescale 1ns / 1ps
 
-module tb_SPI_Slave_CRC;
+module tb_SPI_Slave_CRC();
 
-    // Các tham số cấu hình
-    parameter n = 8;
-    parameter crc_len = 5;
-    
-    // Tín hiệu kết nối với Slave
-    reg n_rst;
-    reg [n-1:0] data_in;
-    reg load;
-    reg sclk;
-    reg MOSI;
-    reg n_cs;
-    
-    wire [n-1:0] data_out;
-    wire MISO;
-    wire rx_data_valid;
-    wire rx_done;
-    wire ready;
-    wire [4:0] crc_out;
-    wire [3:0] ccounter;
-    wire check_feedback;
+    localparam DATA_WIDTH = 8;
+    localparam CRC_WIDTH  = 5;
+    localparam FRAME_LEN  = 13;
 
-    // Biến nội bộ Testbench để lưu dữ liệu Master nhận được
-    reg [12:0] master_rx_buffer;
+    // =========================
+    // Slave pins
+    // =========================
+    reg  [DATA_WIDTH-1:0] Slave_input;
+    reg                   Slave_load;
+    reg                   Slave_nrst;
 
-    // Instantiate module SPI_Slave_CRC
+    reg                   SPI_sclk;
+    reg                   Master_MOSI;
+    reg                   Slave_nCS;
+
+    wire [DATA_WIDTH-1:0] Slave_output;
+    wire                  Slave_MISO;
+    wire                  Slave_ready;
+    wire                  Slave_valid;
+    wire                  Slave_rx_done;
+    wire [CRC_WIDTH-1:0]  Slave_crc_out;
+
+    // =========================
+    // Waveform observe registers
+    // =========================
+    reg [DATA_WIDTH-1:0]  Master_sent;
+    reg [DATA_WIDTH-1:0]  Master_received;
+
+    reg [FRAME_LEN-1:0]   Master_13bit_frame_sent_to_slave;
+    reg [FRAME_LEN-1:0]   Master_13bit_frame_received_from_slave;
+
+    reg                   Current_MOSI_bit;
+    reg                   Current_MISO_bit;
+    reg [3:0]             Bit_counter;
+
+    integer i;
+
+    // =========================
+    // DUT
+    // =========================
     SPI_Slave_CRC #(
-        .n(n),
-        .crc_len(crc_len)
-    ) dut (
-        .n_rst(n_rst),
-        .data_in(data_in),
-        .load(load),
-        .sclk(sclk),
-        .MOSI(MOSI),
-        .n_cs(n_cs),
-        .data_out(data_out),
-        .MISO(MISO),
-        .rx_data_valid(rx_data_valid),
-        .rx_done(rx_done),
-        .crc_out(crc_out),
-        .ccounter(ccounter),
-        .ready(ready),
-        .check_feedback(check_feedback)
+        .n(DATA_WIDTH),
+        .crc_len(CRC_WIDTH),
+        .total_len(FRAME_LEN),
+        .cnum(4),
+        .CPOL(0),
+        .CPHA(0)
+    ) uut (
+        .n_rst(Slave_nrst),
+        .data_in(Slave_input),
+        .load(Slave_load),
+        .sclk(SPI_sclk),
+        .MOSI(Master_MOSI),
+        .n_cs(Slave_nCS),
+
+        .data_out(Slave_output),
+        .MISO(Slave_MISO),
+        .rx_data_valid(Slave_valid),
+        .rx_done(Slave_rx_done),
+        .crc_out(Slave_crc_out),
+        .ready(Slave_ready)
     );
 
-    // TASK: Mô phỏng hành vi của SPI Master truyền/nhận 13 bit
-    // MSB truyền trước. SCLK mặc định bằng 0, dữ liệu mẫu ở sườn lên (CPOL=0, CPHA=0)
-    task master_transfer;
-        input  [12:0] tx_data; // Dữ liệu Master gửi
-        integer i;
-        begin
-            master_rx_buffer = 13'b0; // Reset buffer nhận của master
-            
-            for (i = 12; i >= 0; i = i - 1) begin
-                // Master đẩy bit ra MOSI
-                MOSI = tx_data[i];
-                #20; // Thời gian thiết lập (Setup time)
-                
-                // Master kích sườn LÊN của SCLK (Slave và Master chốt dữ liệu)
-                sclk = 1;
-                master_rx_buffer[i] = MISO; // Master lấy mẫu bit từ MISO của Slave
-                #20; 
-                
-                // Master kích sườn XUỐNG của SCLK
-                sclk = 0;
-            end
-            #20; // Đợi ổn định sau khi xong 1 frame
-        end
+    // =========================
+    // Manual clock
+    // =========================
+    initial begin
+        SPI_sclk = 1'b0;
+    end
+
+    task one_sclk_pulse;
+    begin
+        #10 SPI_sclk = 1'b1;
+        #10 SPI_sclk = 1'b0;
+    end
     endtask
 
-    // KỊCH BẢN MÔ PHỎNG CHÍNH
-    initial begin
-        // Khởi tạo trạng thái ban đầu
-        n_rst = 1;
-        n_cs = 1; // Deactivate CS (Tích cực mức 0)
-        sclk = 0;
-        MOSI = 0;
-        load = 0;
-        data_in = 8'b00000000;
-        
-        // 1. Reset hệ thống (Slave)
-        $display("--- STEP 1: Reset System ---");
-        #10 n_rst = 0; 
-        #20 n_rst = 1;
-        #20;
-        
-        // Dữ liệu mẫu kiểm tra: Data = 8'b1011_0011 (0xB3), CRC5 = 5'b01001 (Tính tay hoặc tool chuẩn)
-        // Chuỗi 13 bit ghép lại: 13'b10110011_01001
-        
-        // -------------------------------------------------------------------------
-        // 2 & 3. Giao dịch 1: Master -> Slave (Chỉ test Master gửi, không quan tâm Slave trả gì)
-        // -------------------------------------------------------------------------
-        $display("--- STEP 2 & 3: Master sends data to Slave ---");
-        n_cs = 0; // Activate CS
-        #40;      // Đợi 1-2 chu kỳ đồng hồ hệ thống theo mô tả
-        
-        master_transfer(13'b10110011_01010);
-        
-        // Kiểm tra tín hiệu valid từ Slave sau khi nhận xong
-        if (rx_done && rx_data_valid)
-            $display("[PASS] Slave nhan dung Data + CRC. Data: %b", data_out);
-        else
-            $display("[FAIL] Slave bao loi CRC hoac chua xong!");
+    // =========================
+    // Tasks
+    // =========================
 
-        n_cs = 0; // Tắt CS chuẩn bị cho bước sau
-        #50;
+    task reset_slave;
+    begin
+        Slave_nCS   = 1'b1;
+        Master_MOSI = 1'b0;
+        Slave_load  = 1'b0;
+        Slave_input = 8'h00;
+        SPI_sclk    = 1'b0;
 
-        // -------------------------------------------------------------------------
-        // 4 & 5. Giao dịch 2: Slave -> Master (Load data vào Slave rồi test gửi về)
-        // -------------------------------------------------------------------------
-        $display("--- STEP 4 & 5: Slave sends data to Master ---");
-        
-        // Tích cực tín hiệu Load
-        data_in = 8'b1100_1010; // Data Slave muốn gửi
+        Master_sent          = 8'h00;
+        Master_received   = 8'h00;
+        Master_13bit_frame_sent_to_slave   = 13'h0000;
+        Master_13bit_frame_received_from_slave = 13'h0000;
+
+        Current_MOSI_bit = 1'b0;
+        Current_MISO_bit = 1'b0;
+        Bit_counter      = 4'd0;
+
+        Slave_nrst = 1'b0;
+        #30;
+        Slave_nrst = 1'b1;
+        #30;
+    end
+    endtask
+
+
+    task master_send_13bit_frame_to_slave;
+        input [7:0] data_bits;
+        input [4:0] crc_bits;
+    begin
+        Master_sent       = data_bits;
+        Master_13bit_frame_sent_to_slave = {data_bits, crc_bits};
+
+        Slave_nCS = 1'b0;
+
+        for (i = FRAME_LEN-1; i >= 0; i = i - 1) begin
+            Bit_counter      = i[3:0];
+            Current_MOSI_bit = Master_13bit_frame_sent_to_slave[i];
+            Master_MOSI      = Current_MOSI_bit;
+
+            one_sclk_pulse();
+        end
+
         #5;
-        load = 1;
-        #20; load = 0; // Tắt Load (tích cực mức thấp như bạn lưu ý trong lúc transmission)
-        
-        n_cs = 0; // Activate CS
-        #40;
-        
-        // Master cấp 13 xung clk, chỉ gửi toàn 0 đi (dummy data) để lấy MISO về
-        master_transfer(13'b00000000_00000); 
-        
-        $display("Master nhan duoc tu Slave: %b", master_rx_buffer);
-        // Lưu ý: Phần kiểm tra CRC ở Master nằm ngoài module này, bạn có thể tự tính để so sánh
-        
-        n_cs = 0; // Tắt CS
-        #50;
 
-        // -------------------------------------------------------------------------
-        // 6. Giao dịch 3: Full-Duplex (Truyền nhận đồng thời)
-        // -------------------------------------------------------------------------
-        $display("--- STEP 6: Full Duplex Transmission ---");
-        
-        // Load data vào Slave trước
-        data_in = 8'b0101_0101; 
-        load = 1; #20; load = 0;
-        
-        n_cs = 0; // Activate CS
-        #40;
-        
-        // Master đồng thời gửi 1 data chuẩn và nhận data từ Slave
-        master_transfer(13'b10110011_01010);
-        
-        if (rx_data_valid)
-            $display("[PASS FULL-DUPLEX] Slave Nhan: %b | Master Nhan: %b", data_out, master_rx_buffer);
-        else
-            $display("[FAIL FULL-DUPLEX] Loi kiem tra CRC tai Slave!");
+        $display("==============================================");
+        $display("MASTER -> SLAVE");
+        $display("8-bit sent to slave      = %b", Master_sent);
+        $display("13-bit frame sent        = %b", Master_13bit_frame_sent_to_slave);
+        $display("Slave output received    = %b", Slave_output);
+        $display("Slave valid              = %b", Slave_valid);
+        $display("Slave rx_done            = %b", Slave_rx_done);
+        $display("==============================================");
 
-        n_cs = 0;
-        #50;
+        Slave_nCS = 1'b1;
+        #30;
+    end
+    endtask
+    
+    task master_send_13bit_frame_to_slave_notena;
+        input [7:0] data_bits;
+        input [4:0] crc_bits;
+    begin
+        Master_sent       = data_bits;
+        Master_13bit_frame_sent_to_slave = {data_bits, crc_bits};
 
-        $display("--- END OF SIMULATION ---");
+        Slave_nCS = 1'b1;
+
+        for (i = FRAME_LEN-1; i >= 0; i = i - 1) begin
+            Bit_counter      = i[3:0];
+            Current_MOSI_bit = Master_13bit_frame_sent_to_slave[i];
+            Master_MOSI      = Current_MOSI_bit;
+
+            one_sclk_pulse();
+        end
+
+        #5;
+
+        $display("==============================================");
+        $display("MASTER -> SLAVE");
+        $display("8-bit sent to slave      = %b", Master_sent);
+        $display("13-bit frame sent        = %b", Master_13bit_frame_sent_to_slave);
+        $display("Slave output received    = %b", Slave_output);
+        $display("Slave valid              = %b", Slave_valid);
+        $display("Slave rx_done            = %b", Slave_rx_done);
+        $display("==============================================");
+
+        Slave_nCS = 1'b1;
+        #30;
+    end
+    endtask
+
+
+    task load_slave_tx_buffer;
+        input [7:0] data_bits;
+    begin
+        Slave_input = data_bits;
+
+        #10;
+        Slave_load = 1'b1;
+        #20;
+        Slave_load = 1'b0;
+        #20;
+    end
+    endtask
+
+
+    task slave_send_13bit_frame_to_master;
+    begin
+        Master_received      = 8'h00;
+        Master_13bit_frame_received_from_slave = 13'h0000;
+
+        Slave_nCS = 1'b0;
+
+        for (i = FRAME_LEN-1; i >= 0; i = i - 1) begin
+            #5;
+
+            Current_MISO_bit = Slave_MISO;
+            Master_13bit_frame_received_from_slave[i] = Current_MISO_bit;
+
+            if (i >= CRC_WIDTH) begin
+                Master_received[i - CRC_WIDTH] = Current_MISO_bit;
+            end
+
+            one_sclk_pulse();
+        end
+
+        #5;
+
+        $display("==============================================");
+        $display("SLAVE -> MASTER");
+        $display("Slave input loaded            = %b", Slave_input);
+        $display("8-bit received from slave     = %b", Master_received);
+        $display("13-bit frame received         = %b", Master_13bit_frame_received_from_slave);
+        $display("Slave generated CRC           = %b", Slave_crc_out);
+        $display("==============================================");
+
+        Slave_nCS = 1'b1;
+        #30;
+    end
+    endtask
+
+
+    task test_master_to_slave_good_crc;
+    begin
+        reset_slave();
+
+        master_send_13bit_frame_to_slave(
+            8'b00111100,
+            5'b10010
+        );
+    end
+    endtask
+
+
+    task test_master_to_slave_bad_crc;
+    begin
+        reset_slave();
+
+        master_send_13bit_frame_to_slave(
+            8'b00111100,
+            5'b10011
+        );
+    end
+    endtask
+
+
+    task test_slave_to_master;
+    begin
+        reset_slave();
+
+        load_slave_tx_buffer(8'b10100101);
+
+        slave_send_13bit_frame_to_master();
+    end
+    endtask
+    
+    task test_master_to_slave_notena;
+    begin
+        reset_slave();
+
+        master_send_13bit_frame_to_slave_notena(
+            8'b00111100,
+            5'b10010
+        );
+    end
+    endtask
+
+    // =========================
+    // Main
+    // =========================
+    initial begin
+        $dumpfile("tb_spi_slave_crc_scenario.vcd");
+
+        // Physical pins
+        $dumpvars(0, SPI_sclk);
+        $dumpvars(0, Slave_nCS);
+        $dumpvars(0, Master_MOSI);
+        $dumpvars(0, Slave_MISO);
+
+        // Important 8-bit observe values
+        $dumpvars(0, Master_sent);
+        $dumpvars(0, Master_received);
+
+        // Full 13-bit observe values
+        $dumpvars(0, Master_13bit_frame_sent_to_slave);
+        $dumpvars(0, Master_13bit_frame_received_from_slave);
+
+        // Current bit observe
+        $dumpvars(0, Current_MOSI_bit);
+        $dumpvars(0, Current_MISO_bit);
+        $dumpvars(0, Bit_counter);
+
+        // Slave outputs
+        $dumpvars(0, Slave_input);
+        $dumpvars(0, Slave_output);
+        $dumpvars(0, Slave_load);
+        $dumpvars(0, Slave_nrst);
+        $dumpvars(0, Slave_ready);
+        $dumpvars(0, Slave_valid);
+        $dumpvars(0, Slave_rx_done);
+        $dumpvars(0, Slave_crc_out);
+
+        test_master_to_slave_good_crc();
+
+        #100;
+
+        test_master_to_slave_bad_crc();
+
+        #100;
+
+        test_slave_to_master();
+        
+        #100;
+        
+        test_master_to_slave_notena();
+
+        #200;
         $finish;
     end
 

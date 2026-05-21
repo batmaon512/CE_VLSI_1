@@ -5,6 +5,7 @@
 \usepackage{circuitikz} % For electrical circuits
 \usepackage{float}
 \usepackage{enumitem}
+\usepackage[T1]{fontenc}
 \usetikzlibrary{shapes.geometric, arrows, positioning, patterns, decorations.pathmorphing}
 \usepackage{booktabs}
 \usepackage{multirow}
@@ -12,22 +13,25 @@
 
 % Configuration
 \newcommand{\var}[1]{\textbf{#1}}
+\DeclareRobustCommand{\code}[1]{\begingroup\def\_{\textunderscore\allowbreak}\textsf{#1}\endgroup}
+\renewcommand{\texttt}[1]{\code{#1}}
+\setlist[itemize]{leftmargin=2.2em,label=--,labelsep=0.6em,itemsep=0.35em,topsep=0.35em,parsep=0pt,partopsep=0pt,align=left}
 \upperuniname{VIETNAM NATIONAL UNIVERSITY HO CHI MINH CITY}
 \uniname{HO CHI MINH CITY UNIVERSITY OF TECHNOLOGY}
 \deptname{FACULTY OF COMPUTER SCIENCE AND ENGINEERING}
 
 \coursename{\LARGE Logic Design \\ \large (CO3097)}
-\reporttype{\Large Report Lab 1}
-\title{\Large Ring Flasher Design and Simulation}
+\reporttype{\Large Report Lab 2}
+\title{\Large SPI Protocol Module}
 
 \advisor{
-Tôn Huỳnh Long
+Ton Huynh Long
 }
 \student{
-   Nguyễn Chí Thanh,  2313078 
-   Nguyễn Việt Hoàng, 2311066
-   Lê Đức Tài,        2312995
-   Mai Xuân Nhựt,     2312549
+   Nguyen Chi Thanh, 2313078
+   Nguyen Viet Hoang, 2311066
+   Le Duc Tai, 2312995
+   Mai Xuan Nhut, 2312549
 }
 \setlength{\parindent}{2em}
 \begin{document}
