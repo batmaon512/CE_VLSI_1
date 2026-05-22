@@ -86,25 +86,7 @@ The third scenario verifies the transmit path from the Master to a selected Slav
     \includegraphics[width=0.8\textwidth]{\detokenize{images/Master_check/Master_TH3.png}}
     \caption{The Master loads data 0x33, selects Slave 3 so that \texttt{Master\_SS = 11110111}, and transmits the 13-bit MOSI frame correctly.}
 \end{figure}
-\subsection{Loop Back Verification (Loop Back Check)}
 
-The loopback verification focuses on continuous data circulation between the Master and Slave after both modules are connected together. Based on \texttt{tb\_SPI\_Circular\_Loopback.v}, this test checks the \texttt{loopback\_transfer} behavior in the checklist by confirming that the Master can first send data to the Slave, then the Slave stores the received value, reloads it into its transmit buffer, and returns the same value back to the Master in the next transaction. The waveform also confirms that the handshake signals operate according to the specification: \texttt{m\_ready} is asserted in the idle or setup phases, deasserted during transfer, and \texttt{m\_valid} indicates successful frame completion after CRC checking.
-
-\begin{itemize}
-    \item Sending data from the Master to the Slave in the first transaction of the loopback sequence.
-    \item Storing the received value inside the Slave and reloading it into the Slave transmit path.
-    \item Returning the same data from the Slave back to the Master in the next transaction.
-    \item Verifying continuous circular communication behavior between both modules.
-    \item Checking that \texttt{SS}, \texttt{SCLK}, \texttt{MOSI}, \texttt{MISO}, \texttt{ready}, and \texttt{valid} operate consistently throughout the loopback process.
-\end{itemize}
-
-\paragraph{LoopBack\_TH1 -- Circular loopback transfer}
-In this testbench, the initial payload loaded into the Master is \texttt{0x99}. During the first loop, the Master loads the data, selects Slave 0, and transmits the frame to the Slave through \texttt{MOSI}. The Slave receives and stores the transmitted value correctly. In the second loop, the Slave loads its output data back into the transmit path and sends the same value \texttt{0x99} to the Master through \texttt{MISO}. At the same time, the Master also reloads its input path to continue the communication cycle. The final waveform confirms that the data returning to the Master matches the original transmitted value, proving that the circular ping-pong loopback mechanism works correctly. This case also demonstrates correct synchronization between \texttt{SS}, \texttt{SCLK}, \texttt{MOSI}, and \texttt{MISO}, since data movement only occurs while the Slave is selected and the transfer clock is active.
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.8\textwidth]{\detokenize{images/LoopBack_Check/LoopBack.png}}
-    \caption{The Master sends 0x99 to the Slave, the Slave stores and returns the same value, and the circular loopback transfer is verified successfully.}
-\end{figure}
 \subsection{Integrated System Verification (Full SPI Communication Check)}
 
 \noindent The integrated system verification uses the complete Master-Slave connection in \texttt{tb\_Com\_Full\_Module.v} to validate end-to-end SPI behavior. This subsection covers the main checklist items for the full communication system: \texttt{master\_to\_slave\_transfer}, \texttt{slave\_to\_master\_transfer}, \texttt{full\_duplex\_transfer}, \texttt{crc\_error\_detection\_integrated}, \texttt{ss\_sclk\_sync\_integrated}, and \texttt{idle\_to\_transfer\_recovery}. The simulation is organized into three practical communication phases that together verify the complete integrated behavior of the design.
@@ -145,3 +127,22 @@ The final integrated scenario verifies simultaneous bidirectional communication.
     \caption{The Master sends 0x33 while the Slave simultaneously sends 0xCC, verifying correct full-duplex SPI communication.}
 \end{figure}
 
+\subsection{Loop Back Verification (Loop Back Check)}
+
+The loopback verification focuses on continuous data circulation between the Master and Slave after both modules are connected together. Based on \texttt{tb\_SPI\_Circular\_Loopback.v}, this test checks the \texttt{loopback\_transfer} behavior in the checklist by confirming that the Master can first send data to the Slave, then the Slave stores the received value, reloads it into its transmit buffer, and returns the same value back to the Master in the next transaction. The waveform also confirms that the handshake signals operate according to the specification: \texttt{m\_ready} is asserted in the idle or setup phases, deasserted during transfer, and \texttt{m\_valid} indicates successful frame completion after CRC checking.
+
+\begin{itemize}
+    \item Sending data from the Master to the Slave in the first transaction of the loopback sequence.
+    \item Storing the received value inside the Slave and reloading it into the Slave transmit path.
+    \item Returning the same data from the Slave back to the Master in the next transaction.
+    \item Verifying continuous circular communication behavior between both modules.
+    \item Checking that \texttt{SS}, \texttt{SCLK}, \texttt{MOSI}, \texttt{MISO}, \texttt{ready}, and \texttt{valid} operate consistently throughout the loopback process.
+\end{itemize}
+
+\paragraph{LoopBack\_TH1 -- Circular loopback transfer}
+In this testbench, the initial payload loaded into the Master is \texttt{0x99}. During the first loop, the Master loads the data, selects Slave 0, and transmits the frame to the Slave through \texttt{MOSI}. The Slave receives and stores the transmitted value correctly. In the second loop, the Slave loads its output data back into the transmit path and sends the same value \texttt{0x99} to the Master through \texttt{MISO}. At the same time, the Master also reloads its input path to continue the communication cycle. The final waveform confirms that the data returning to the Master matches the original transmitted value, proving that the circular ping-pong loopback mechanism works correctly. This case also demonstrates correct synchronization between \texttt{SS}, \texttt{SCLK}, \texttt{MOSI}, and \texttt{MISO}, since data movement only occurs while the Slave is selected and the transfer clock is active.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{\detokenize{images/LoopBack_Check/LoopBack.png}}
+    \caption{The Master sends 0x99 to the Slave, the Slave stores and returns the same value, and the circular loopback transfer is verified successfully.}
+\end{figure}
