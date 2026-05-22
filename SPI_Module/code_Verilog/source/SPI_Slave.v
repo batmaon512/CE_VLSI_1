@@ -88,13 +88,15 @@ module crc5 (
     input  wire       enable,
     input  wire       serial_in,
     
-    output reg  [4:0] crc_out
+    output reg  [4:0] crc_out,
+    output wire check_feedback
 );
 
     wire feedback;
 
 // fix this bug
     assign feedback = serial_in ^ crc_out[4];
+    assign check_feedback = feedback;
     
     always @(posedge clk or posedge reset) begin
         if (reset) begin
@@ -118,7 +120,7 @@ module crc5_checker (
     input  wire       serial_in,
     
     output wire       data_valid,
-    output wire [4:0]       check_crc_out
+    output wire       check_feedback
 );
 
     wire [4:0] current_crc;
@@ -128,12 +130,71 @@ module crc5_checker (
         .reset(reset),
         .enable(enable),
         .serial_in(serial_in),
-        .crc_out(current_crc)
+        .crc_out(current_crc),
+        .check_feedback(check_feedback)
     );
 
     assign data_valid = ~(|current_crc);
-    assign check_crc_out = current_crc;
+
 endmodule
+
+
+//  state machine: active cs -> idle state -> transmission state if master generate multiple of 8 cycles -> idle state -> deactivate cs
+
+// Một số điểm lưu ý của submodule
+// Chuẩn thì sẽ có xung clk hệ thống riêng của sensor chứa submodule này để đồng bộ tín hiệu load
+// -> Nhưng nếu lấy thêm clk system thì clk system nó cần xác định là liệu nó sẽ lm nhanh hay lm chậm hơn clk từ master
+module SPI_Slave#(
+    parameter n = 8,
+    parameter cnum = $clog2(n),
+    parameter CPOL = 0,
+    parameter CPAH = 0,
+    parameter CLK_CTRL = CPOL ^ CPAH 
+)(  
+    input wire n_rst,
+    input wire [n-1:0] data_in,
+    input wire load,
+    input wire sclk,
+    input wire MOSI,
+    input wire n_cs,
+    
+    output wire [n-1:0] data_out,
+    output wire MISO,
+    output reg ready
+);  
+    reg [cnum-1:0] counter;
+    wire inter_clk;
+    
+    assign inter_clk = sclk ^ CLK_CTRL; // generate internal clock to serve CPHA and CPOL
+    
+    serial_to_parallel MOSI_Block(.data_in(MOSI), .clk(inter_clk), .ena(~n_cs), .data_out(data_out));
+    Parallel_to_serial MISO_Block(.data_in(data_in), .load(load), .clk(inter_clk), .ena(~n_cs), .data_out(MISO));
+    
+// the operation of slave
+    // when transmission is happening -> counter will increase by 1 (counter != 0 -> transmission).
+    always @(posedge inter_clk or negedge n_rst ) begin
+        if (n_rst == 0) begin
+            counter <= 0;
+        end
+        else begin
+            counter <= counter + 1;
+        end
+    end
+    
+    
+    // combination to check ready by checking the value of counter. 
+    always @(*) begin
+        if (counter) begin
+            ready = 0;
+        end
+        else begin
+            ready = 1;
+        end
+    end
+
+endmodule
+
+
 
 
 // The behavior of module 
@@ -161,21 +222,23 @@ module SPI_Slave_CRC #(
     output wire rx_data_valid, 
     output wire rx_done,
     output wire [crc_len-1:0] crc_out,  
-    output reg ready
-                    
+    output reg ready,
+    
+    // checker 
+    output wire [3:0] ccounter,  
+    output wire csclk,  
+    output wire check_feedback             
 );  
 
     reg [cnum-1:0] counter;
     wire inter_clk;
-    wire check_crc;
     
     assign inter_clk = sclk ^ CLK_CTRL; 
-
-    assign rx_data_valid = (counter == 13)? check_crc: 1'b1;
+    assign csclk = sclk;
     
     //INSTANTIATE CÁC KHỐI DỊCH DATA (Chỉ chạy 8 nhịp đầu)
     wire tx_miso_data; 
-    wire shift_ena = (~n_cs) && (counter < n || counter == total_len); 
+    wire shift_ena = (~n_cs) && (counter < n); 
     
     serial_to_parallel #(n) MOSI_Block (
         .data_in(MOSI), 
@@ -187,7 +250,7 @@ module SPI_Slave_CRC #(
     Parallel_to_serial #(n) MISO_Block (
         .data_in(data_in), 
         .load(load), 
-        .clk(~inter_clk), 
+        .clk(inter_clk), 
         .ena(shift_ena), 
         .data_out(tx_miso_data)
     );
@@ -209,7 +272,8 @@ module SPI_Slave_CRC #(
         .reset(~n_rst),    
         .enable(~n_cs),   
         .serial_in(MOSI),
-        .data_valid(check_crc)
+        .data_valid(rx_data_valid),
+        .check_feedback(check_feedback)
     );
 
     // C. MẠCH MUX MISO VÀ ĐIỀU KHIỂN LOGIC

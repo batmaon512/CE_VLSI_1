@@ -4,6 +4,15 @@
 
 The \texttt{SPI\_Top} design was synthesized using Cadence Genus. The top-level architecture connects one master module and two slave modules into a single system-level block, together with the supporting serial/parallel buffers and CRC logic.
 
+
+\begin{figure}
+    \centering
+    % [Insert block diagram of SPI\_Top architecture here]
+    \includegraphics[width=1\linewidth]{graphics/SPI_Top.png}
+    \caption{Block diagram of the SPI\_Top architecture}
+    \label{fig:spi_top_arch}
+\end{figure}
+
 After synthesis, the key generated files are:
 \begin{itemize}
     \item Netlist: \texttt{outputs??/\${DESIGN}\_m.v} \; (for example, \texttt{bound\_flasher\_m.v})
@@ -11,6 +20,15 @@ After synthesis, the key generated files are:
     \item QoR report: \texttt{reports??/final\_qor.rpt}
     \item Timing report: \texttt{reports??/final\_time.rpt}
 \end{itemize}
+
+\begin{figure}[H]
+    \centering
+    % [Insert Cadence synthesis flow diagram here]
+    \includegraphics[width=1\linewidth]{graphics/synthesic_log.png}
+    \caption{Overview of the Cadence synthesis flow for SPI\_Top}
+    \label{fig:synthesis_flow}
+\end{figure}
+
 \subsection{Netlist Output}
 
 The synthesized netlist describes the structural implementation of \texttt{SPI\_Top} after logic optimization. It includes the master block, slave blocks, CRC logic, and the required multiplexing and control paths. This file is the main reference for the final gate-level structure.
@@ -113,6 +131,42 @@ Total violating paths & 0 & PASS \\
     \label{fig:timing_report}
 \end{figure}
 
+
+\subsection{Schematic View}
+
+The synthesized netlist can be visualized as a schematic to confirm the structural integrity of the design. The master block, slave blocks, and CRC logic are clearly identifiable, and the interconnections match the expected architecture.
+\begin{figure}[H]
+    \centering
+    % [Insert schematic view screenshot here]
+    \includegraphics[width=1\linewidth]{graphics/sche1.jpg}
+    \caption{Schematic view of the synthesized SPI\_Top design}
+    \label{fig:schematic_view}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    % [Insert schematic view screenshot here]
+    \includegraphics[width=1\linewidth]{graphics/sche2.jpg}
+    \caption{More detailed schematic view of the synthesized SPI\_Top design}
+    \label{fig:detailed_schematic}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    % [Insert schematic view screenshot here]
+    \includegraphics[width=0.5\linewidth]{graphics/sche3.jpg}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    % [Insert schematic view screenshot here]
+    \includegraphics[width=0.5\linewidth]{graphics/sche4.jpg}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    % [Insert schematic view screenshot here]
+    \includegraphics[width=0.5\linewidth]{graphics/sche5.jpg}
+\end{figure}
 \subsection{Conclusion}
 
 The Cadence synthesis results confirm that the \texttt{SPI\_Top} design is structurally compact and timing-clean. The generated netlist, area report, QoR report, and timing report all indicate that the design is ready for the next verification or implementation stage.

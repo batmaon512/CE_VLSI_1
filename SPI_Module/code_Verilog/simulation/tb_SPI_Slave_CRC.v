@@ -140,6 +140,39 @@ module tb_SPI_Slave_CRC();
         #30;
     end
     endtask
+    
+    task master_send_13bit_frame_to_slave_notena;
+        input [7:0] data_bits;
+        input [4:0] crc_bits;
+    begin
+        Master_sent       = data_bits;
+        Master_13bit_frame_sent_to_slave = {data_bits, crc_bits};
+
+        Slave_nCS = 1'b1;
+
+        for (i = FRAME_LEN-1; i >= 0; i = i - 1) begin
+            Bit_counter      = i[3:0];
+            Current_MOSI_bit = Master_13bit_frame_sent_to_slave[i];
+            Master_MOSI      = Current_MOSI_bit;
+
+            one_sclk_pulse();
+        end
+
+        #5;
+
+        $display("==============================================");
+        $display("MASTER -> SLAVE");
+        $display("8-bit sent to slave      = %b", Master_sent);
+        $display("13-bit frame sent        = %b", Master_13bit_frame_sent_to_slave);
+        $display("Slave output received    = %b", Slave_output);
+        $display("Slave valid              = %b", Slave_valid);
+        $display("Slave rx_done            = %b", Slave_rx_done);
+        $display("==============================================");
+
+        Slave_nCS = 1'b1;
+        #30;
+    end
+    endtask
 
 
     task load_slave_tx_buffer;
@@ -225,6 +258,17 @@ module tb_SPI_Slave_CRC();
         slave_send_13bit_frame_to_master();
     end
     endtask
+    
+    task test_master_to_slave_notena;
+    begin
+        reset_slave();
+
+        master_send_13bit_frame_to_slave_notena(
+            8'b00111100,
+            5'b10010
+        );
+    end
+    endtask
 
     // =========================
     // Main
@@ -270,6 +314,10 @@ module tb_SPI_Slave_CRC();
         #100;
 
         test_slave_to_master();
+        
+        #100;
+        
+        test_master_to_slave_notena();
 
         #200;
         $finish;
