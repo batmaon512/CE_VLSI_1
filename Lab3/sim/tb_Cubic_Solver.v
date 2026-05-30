@@ -3,18 +3,20 @@
 module tb_Cubic_Solver;
 
     localparam CLK_PERIOD = 10;
+    localparam integer MAX_CYCLES = 2000;
 
     localparam [3:0] IDLE             = 4'b0000;
     localparam [3:0] STANDARDIZE      = 4'b0001;
     localparam [3:0] DELTA_COMPUTE    = 4'b0010;
-    localparam [3:0] Sqrt_COMPUTE     = 4'b0011;
-    localparam [3:0] BRANCH_CHECK     = 4'b0100;
-    localparam [3:0] Cbrt_COMPUTE_R   = 4'b0101;
-    localparam [3:0] Cbrt_COMPUTE_C   = 4'b0110;
-    localparam [3:0] CASE1_COMPUTE    = 4'b0111;
-    localparam [3:0] CASE2A_COMPUTE   = 4'b1000;
-    localparam [3:0] CASE2B_COMPUTE   = 4'b1001;
-    localparam [3:0] DONE             = 4'b1010;
+    localparam [3:0] CASE_CHECK       = 4'b0011;
+    localparam [3:0] Sqrt_COMPUTE     = 4'b0100;
+    localparam [3:0] BRANCH_CHECK     = 4'b0101;
+    localparam [3:0] Cbrt_COMPUTE_R   = 4'b0110;
+    localparam [3:0] Cbrt_COMPUTE_C   = 4'b0111;
+    localparam [3:0] CASE1_COMPUTE    = 4'b1000;
+    localparam [3:0] CASE2A_COMPUTE   = 4'b1001;
+    localparam [3:0] CASE2B_COMPUTE   = 4'b1010;
+    localparam [3:0] DONE             = 4'b1011;
 
     reg clk;
     reg rst_n;
@@ -71,6 +73,7 @@ module tb_Cubic_Solver;
                 IDLE:           state_name = "IDLE";
                 STANDARDIZE:    state_name = "STANDARDIZE";
                 DELTA_COMPUTE:  state_name = "DELTA_COMPUTE";
+                CASE_CHECK:     state_name = "CASE_CHECK";
                 Sqrt_COMPUTE:   state_name = "SQRT_COMPUTE";
                 BRANCH_CHECK:   state_name = "BRANCH_CHECK";
                 Cbrt_COMPUTE_R: state_name = "CBRT_R";
@@ -95,6 +98,7 @@ module tb_Cubic_Solver;
                 dut.delay_count,
                 dut.iteration_count,
                 dut.case_index,
+                dut.READY_BRANCH_CHECK,
                 dut.r_a,
                 dut.r_b,
                 dut.r_c,
@@ -126,13 +130,17 @@ module tb_Cubic_Solver;
         start = 1'b0;
 
         begin : finish_test
-            repeat (120) begin
+            repeat (MAX_CYCLES) begin
                 @(posedge clk);
                 show_cycle();
-                if (done) begin
-                    $display("[%0t] Done asserted, stopping simulation.", $time);
-                    wait_cycles(2);
-                    disable finish_test;
+                if (dut.state == BRANCH_CHECK) begin
+                    if (dut.iteration_count >= 2) begin
+                        $display("[%0t] Reached BRANCH_CHECK after %0d iterations, stopping simulation.", $time, dut.iteration_count);
+                        wait_cycles(2);
+                        disable finish_test;
+                    end else begin
+                        $display("[%0t] Reached BRANCH_CHECK too early (iter=%0d), continuing...", $time, dut.iteration_count);
+                    end
                 end
             end
 
