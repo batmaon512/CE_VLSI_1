@@ -5,7 +5,7 @@ module Cubic_Solver #(
     input wire        clk,
     input wire        rst_n,
     input wire        start,
-    output wire        done,
+    output reg        done,
 //   
     input  wire [31:0] FP_a,
     input  wire [31:0] FP_b,
@@ -111,6 +111,7 @@ always @(*) begin
     DivInput2 = 32'd0;
     MulInput1 = 32'd0;
     MulInput2 = 32'd0;
+    done = 1'b0;
     case(state)
         IDLE: begin
         end
@@ -132,8 +133,70 @@ always @(*) begin
                 DivInput2 = {~r_a[31], r_a[30:0]};
             end
         end
+        DELTA_COMPUTE: begin
+            // Clock 0: r_b * r_b
+            if(delay_count == 0) begin
+                MulInput1 = r_b;
+                MulInput2 = r_b;
+            end
+            // Clock 1: r_b * r_c
+            if(delay_count == 1) begin
+                MulInput1 = r_b;
+                MulInput2 = r_c;
+            end
+            // Clock 7: (r_b<<1) * MulOutput; MulOutput + r_c
+            if(delay_count == 7) begin
+                MulInput1 = {r_b[31], r_b[30:23] + 8'd1, r_b[22:0]}; // r_b << 1
+                MulInput2 = MulOutput;
+                AddInput1 = MulOutput;
+                AddInput2 = r_c;
+            end
+            // Clock 8: MulOutput + r_d
+            if(delay_count == 8) begin
+                AddInput1 = MulOutput;
+                AddInput2 = r_d;
+            end
+            // Clock 12: AddOutput * AddOutput; AddOutput -> r_delta_0
+            if(delay_count == 12) begin
+                MulInput1 = AddOutput;
+                MulInput2 = AddOutput;
+            end
+            // Clock 13: (AddOutput<<1) + AddOutput
+            if(delay_count == 13) begin
+                AddInput1 = {AddOutput[31], AddOutput[30:23] + 8'd1, AddOutput[22:0]}; // AddOutput << 1
+                AddInput2 = AddOutput;
+            end
+            // Clock 14: MulOutput -> r_temp[0]
+            if(delay_count == 14) begin
+                // Will be stored in sequential logic
+            end
+            // Clock 18: r_temp[0] + AddOutput
+            if(delay_count == 18) begin
+                AddInput1 = r_temp[0];
+                AddInput2 = AddOutput;
+            end
+            // Clock 19: MulOutput * (-r_delta_0<<2)
+            if(delay_count == 19) begin
+                MulInput1 = MulOutput;
+                MulInput2 = {~r_delta_0[31], r_delta_0[30:23] + 8'd2, r_delta_0[22:0]};
+            end
+            // Clock 23: AddOutput * AddOutput -> r_delta_1
+            if(delay_count == 23) begin
+                MulInput1 = AddOutput;
+                MulInput2 = AddOutput;
+            end
+            // Clock 26: MulOutput -> r_delta_0_Compare
+            if(delay_count == 26) begin
+                // Will be stored in sequential logic
+            end
+            // Clock 30: MulOutput + r_delta_0_Compare
+            if(delay_count == 30) begin
+                AddInput1 = MulOutput;
+                AddInput2 = r_delta_0_Compare;
+            end
+        end
         DONE: begin
-            done <= 1'b1;
+            done = 1'b1;
         end
         default: begin
             // For other states, you can keep the outputs unchanged or set them to some intermediate values if needed for debugging.
@@ -180,7 +243,7 @@ always @(posedge clk) begin
                     case_index <= 2'd0;
                 end
                 STANDARDIZE: begin
-                    if(delay_count < 24) begin
+                    if(delay_count < 23) begin
                         delay_count <= delay_count + 1;
                     end else begin
                         delay_count <= 0; // Reset for next state
@@ -196,6 +259,33 @@ always @(posedge clk) begin
                     end
                     if(delay_count == 23) begin
                         r_d <= DivOutput;
+                    end
+                end
+                DELTA_COMPUTE: begin
+                    if(delay_count < 35) begin
+                        delay_count <= delay_count + 1;
+                    end else begin
+                        delay_count <= 0;
+                    end
+                    // Clock 12: Store r_delta_0 = AddOutput
+                    if(delay_count == 12) begin
+                        r_delta_0 <= AddOutput;
+                    end
+                    // Clock 14: Store r_temp[0] = MulOutput
+                    if(delay_count == 14) begin
+                        r_temp[0] <= MulOutput;
+                    end
+                    // Clock 23: Store r_delta_1 = MulOutput
+                    if(delay_count == 23) begin
+                        r_delta_1 <= MulOutput;
+                    end
+                    // Clock 26: Store r_delta_0_Compare = MulOutput
+                    if(delay_count == 26) begin
+                        r_delta_0_Compare <= MulOutput;
+                    end
+                    // Clock 35: Store r_delta = AddOutput
+                    if(delay_count == 35) begin
+                        r_delta <= AddOutput;
                     end
                 end
                 default: begin

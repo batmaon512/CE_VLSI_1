@@ -18,11 +18,13 @@ module tb_Cubic_Solver;
 
     reg clk;
     reg rst_n;
+    reg start;
     reg [31:0] FP_a;
     reg [31:0] FP_b;
     reg [31:0] FP_c;
     reg [31:0] FP_d;
 
+    wire done;
     wire [31:0] FP_x0_re;
     wire [31:0] FP_x0_im;
     wire [31:0] FP_x1_re;
@@ -33,6 +35,8 @@ module tb_Cubic_Solver;
     Cubic_Solver dut (
         .clk(clk),
         .rst_n(rst_n),
+        .start(start),
+        .done(done),
         .FP_a(FP_a),
         .FP_b(FP_b),
         .FP_c(FP_c),
@@ -83,10 +87,11 @@ module tb_Cubic_Solver;
     task automatic show_cycle;
         begin
             $display(
-                "[%0t] state=%s next=%s delay=%0d iter=%0d case=%0d r_a=%h r_b=%h r_c=%h r_d=%h x0=%h x1=%h x2=%h",
+                "[%0t] state=%s next=%s done=%b delay=%0d iter=%0d case=%0d r_a=%h r_b=%h r_c=%h r_d=%h x0=%h x1=%h x2=%h",
                 $time,
                 state_name(dut.state),
                 state_name(dut.next_state),
+                done,
                 dut.delay_count,
                 dut.iteration_count,
                 dut.case_index,
@@ -105,6 +110,7 @@ module tb_Cubic_Solver;
         $dumpfile("Lab3/sim/tb_Cubic_Solver.vcd");
         $dumpvars(0, tb_Cubic_Solver);
 
+        start = 1'b0;
         FP_a = 32'h3f800000; // 1.0
         FP_b = 32'hc0c00000; // -6.0
         FP_c = 32'h41300000; // 11.0
@@ -114,13 +120,18 @@ module tb_Cubic_Solver;
         wait_cycles(3);
         rst_n = 1'b1;
 
+        @(posedge clk);
+        start = 1'b1;
+        @(posedge clk);
+        start = 1'b0;
+
         begin : finish_test
-            repeat (50) begin
+            repeat (120) begin
                 @(posedge clk);
                 show_cycle();
-                if (dut.state == DELTA_COMPUTE) begin
-                    $display("[%0t] Reached DELTA_COMPUTE, stopping after one extra check window.", $time);
-                    wait_cycles(3);
+                if (done) begin
+                    $display("[%0t] Done asserted, stopping simulation.", $time);
+                    wait_cycles(2);
                     disable finish_test;
                 end
             end
