@@ -4,6 +4,8 @@ module Cubic_Solver #(
 )(
     input wire        clk,
     input wire        rst_n,
+    input wire        start,
+    output wire        done,
 //   
     input  wire [31:0] FP_a,
     input  wire [31:0] FP_b,
@@ -17,17 +19,17 @@ module Cubic_Solver #(
     output reg [31:0] FP_x2_im
 );
 //Input in FP operation, output in FP operation
-wire [31:0] MulInput1, MulInput2;
+reg [31:0] MulInput1, MulInput2;
 wire [31:0] MulOutput;
 
-wire [31:0] AddInput1, AddInput2;
+reg  [31:0] AddInput1, AddInput2;
 wire [31:0] AddOutput;
 
-wire [31:0] DivInput1, DivInput2;
+reg  [31:0] DivInput1, DivInput2;
 wire [31:0] DivOutput;
 
 //FP operation
-Mul_FP Mul_FP_0 (.clk(clk),.FP_in1(FP_a),.FP_in2(FP_b),.FP_out(MulOutput));
+Mul_FP Mul_FP_0 (.clk(clk),.FP_in1(MulInput1),.FP_in2(MulInput2),.FP_out(MulOutput));
 
 Add_FP Add_FP_0 (.clk(clk),.in1(AddInput1),.in2(AddInput2),.data_out(AddOutput));
 
@@ -76,7 +78,7 @@ end
 always @(*) begin
     case(state)
         IDLE:
-            next_state = STANDARDIZE;
+            next_state = start ? STANDARDIZE : IDLE;
         STANDARDIZE:
             next_state = (delay_count == 23) ? DELTA_COMPUTE : STANDARDIZE;
         DELTA_COMPUTE:
@@ -103,12 +105,18 @@ always @(*) begin
 end
 // Output Logic
 always @(*) begin
+    AddInput1 = 32'd0;
+    AddInput2 = 32'd0;
+    DivInput1 = 32'd0;
+    DivInput2 = 32'd0;
+    MulInput1 = 32'd0;
+    MulInput2 = 32'd0;
     case(state)
         IDLE: begin
         end
         STANDARDIZE: begin
             if(delay_count == 0) begin
-                AddInput1 = {r_a[31], r_a[30:23] + 8'1, r_a[22:0]};
+                AddInput1 = {r_a[31], r_a[30:23] + 8'd1, r_a[22:0]};
                 AddInput2 = r_a;
             end
             if(delay_count == 5) begin
@@ -117,15 +125,15 @@ always @(*) begin
             end
             if(delay_count == 6) begin
                 DivInput1 = r_c;
-                DivInput2 = r_a;
+                DivInput2 = {~r_a[31], r_a[30:0]};
             end
             if(delay_count == 7) begin
                 DivInput1 = r_d;
-                DivInput2 = r_a;
+                DivInput2 = {~r_a[31], r_a[30:0]};
             end
         end
         DONE: begin
-           
+            done <= 1'b1;
         end
         default: begin
             // For other states, you can keep the outputs unchanged or set them to some intermediate values if needed for debugging.
@@ -134,57 +142,66 @@ always @(*) begin
 end
 
 always @(posedge clk) begin
-        case(state)
-            IDLE: begin
-                r_a <= FP_a;
-                r_b <= FP_b;
-                r_c <= FP_c;
-                r_d <= FP_d;
-            end
-            STANDARDIZE: begin
-                if(delay_count < 24) begin
-                    delay_count <= delay_count + 1;
-                end else begin
-                    delay_count <= 0; // Reset for next state
+        if (!rst_n) begin
+            r_a <= 32'd0;
+            r_b <= 32'd0;
+            r_c <= 32'd0;
+            r_d <= 32'd0;
+            r_delta <= 32'd0;
+            r_delta_0 <= 32'd0;
+            r_delta_1 <= 32'd0;
+            r_delta_0_Compare <= 32'd0;
+            r_sqrt_input <= 32'd0;
+            r_sqrt_output <= 32'd0;
+            r_cbrt_re_input <= 32'd0;
+            r_cbrt_im_input <= 32'd0;
+            r_cbrt_re_output <= 32'd0;
+            r_cbrt_im_output <= 32'd0;
+            r_C_re <= 32'd0;
+            r_C_im <= 32'd0;
+            FP_x0_re <= 32'd0;
+            FP_x0_im <= 32'd0;
+            FP_x1_re <= 32'd0;
+            FP_x1_im <= 32'd0;
+            FP_x2_re <= 32'd0;
+            FP_x2_im <= 32'd0;
+            delay_count <= 7'd0;
+            iteration_count <= 5'd0;
+            case_index <= 2'd0;
+        end else begin
+            case(state)
+                IDLE: begin
+                    r_a <= FP_a;
+                    r_b <= FP_b;
+                    r_c <= FP_c;
+                    r_d <= FP_d;
+                    delay_count <= 7'd0;
+                    iteration_count <= 5'd0;
+                    case_index <= 2'd0;
                 end
-                if(delay_count == 5) begin
-                    r_a <= AddOutput;
+                STANDARDIZE: begin
+                    if(delay_count < 24) begin
+                        delay_count <= delay_count + 1;
+                    end else begin
+                        delay_count <= 0; // Reset for next state
+                    end
+                    if(delay_count == 5) begin
+                        r_a <= AddOutput;
+                    end
+                    if(delay_count == 21) begin
+                        r_b <= DivOutput;
+                    end
+                    if(delay_count == 22) begin
+                        r_c <= DivOutput;
+                    end
+                    if(delay_count == 23) begin
+                        r_d <= DivOutput;
+                    end
                 end
-                if(delay_count == 21) begin
-                    r_b <= DivOutput;
+                default: begin
                 end
-                if(delay_count == 22) begin
-                    r_c <= DivOutput;
-                end
-                if(delay_count == 23) begin
-                    r_d <= DivOutput;
-                end
-            end
-            DELTA_COMPUTE: begin
-                if(delay_count < 36) begin
-                    delay_count <= delay_count + 1;
-                end else begin
-                    delay_count <= 0; // Reset for next state
-                end
-            end
-            Sqrt_COMPUTE: begin
-                if(iteration_count < Iteration_Sqrt && r_sqrt_input[30:23] >= 2) begin
-                    iteration_count <= iteration_count + 1;
-                    // Update r_sqrt_input and r_sqrt_output based on the iterative method you choose (e.g., Newton's method).
-                end else begin
-                    iteration_count <= 0; // Reset for next state
-                end
-            end
-            Cbrt_COMPUTE_R, Cbrt_COMPUTE_C: begin
-                if(iteration_count < Iteration_Cbrt && ((state == Cbrt_COMPUTE_R && r_cbrt_re_input[30:23] >= 2) || state == Cbrt_COMPUTE_C)) begin
-                    iteration_count <= iteration_count + 1;
-                    // Update r_cbrt_re_input, r_cbrt_im_input, r_cbrt_re_output, and r_cbrt_im_output based on the iterative method you choose.
-                end else begin
-                    iteration_count <= 0; // Reset for next state
-                    if(state == Cbrt_COMPUTE_R) case_index[1] <= 1; // Mark that we have completed the real cube root computation.
-                end
-            end
-        endcase
+            endcase
+        end
     end
 
 
