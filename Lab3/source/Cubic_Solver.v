@@ -104,6 +104,37 @@ wire [31:0] DivOutput;
 
 reg [7:0] cbrt_scale_in;
 wire [7:0] cbrt_scale_out;
+wire [31:0] add_output_div2 = {AddOutput[31], AddOutput[30:23] - 8'd1, AddOutput[22:0]}; // AddOutput / 2
+wire [7:0] sqrt_output_exp = (({1'b0, r_delta[30:23]} + 9'd127) >> 1);
+wire [31:0] sqrt_output_init = {1'b0, sqrt_output_exp, r_delta[22:0]};
+wire [7:0] r_delta_1_exp_minus1 = r_delta_1[30:23] != 0 ? r_delta_1[30:23] - 8'd1 : 0;
+wire [7:0] r_sqrt_output_exp_minus1 = r_sqrt_output[30:23] != 0 ? r_sqrt_output[30:23] - 8'd1 : 0;
+wire [7:0] r_a_exp_plus1 = r_a[30:23] + 8'd1;
+wire [31:0] r_a_shift_left1 = {r_a[31], r_a_exp_plus1, r_a[22:0]};
+wire [31:0] neg_r_a = {~r_a[31], r_a[30:0]};
+wire [31:0] neg_add_output = {~AddOutput[31], AddOutput[30:0]};
+wire [7:0] r_b_exp_plus1 = r_b[30:23] + 8'd1;
+wire [31:0] r_b_shift_left1 = {r_b[31], r_b_exp_plus1, r_b[22:0]};
+wire [7:0] add_output_exp_plus1 = AddOutput[30:23] + 8'd1;
+wire [31:0] add_output_shift_left1 = {AddOutput[31], add_output_exp_plus1, AddOutput[22:0]};
+wire [7:0] r_delta_0_exp_plus2 = r_delta_0[30:23] + 8'd2;
+wire [31:0] neg_r_delta_0_shift_left2 = {~r_delta_0[31], r_delta_0_exp_plus2, r_delta_0[22:0]};
+wire [7:0] r_sqrt_input_exp_plus1 = r_sqrt_input[30:23] + 8'd1;
+wire [31:0] r_sqrt_input_shift_left1 = {r_sqrt_input[31], r_sqrt_input_exp_plus1, r_sqrt_input[22:0]};
+wire [7:0] r_temp1_exp_plus1 = r_temp[1][30:23] + 8'd1;
+wire [31:0] r_temp1_shift_left1 = {r_temp[1][31], r_temp1_exp_plus1, r_temp[1][22:0]};
+wire [7:0] r_cbrt_re_input_exp_plus1 = r_cbrt_re_input[30:23] + 8'd1;
+wire [31:0] r_cbrt_re_input_shift_left1 = {r_cbrt_re_input[31], r_cbrt_re_input_exp_plus1, r_cbrt_re_input[22:0]};
+wire [7:0] r_cbrt_re_output_exp_plus1 = r_cbrt_re_output[30:23] + 8'd1;
+wire [31:0] r_cbrt_re_output_shift_left1 = {r_cbrt_re_output[31], r_cbrt_re_output_exp_plus1, r_cbrt_re_output[22:0]};
+wire [7:0] r_C_re_exp_plus1 = r_C_re[30:23] + 8'd1;
+wire [31:0] r_C_re_shift_left1 = {r_C_re[31], r_C_re_exp_plus1, r_C_re[22:0]};
+wire [7:0] mul_output_exp_plus1 = MulOutput[30:23] + 8'd1;
+wire [31:0] mul_output_shift_left1 = {MulOutput[31], mul_output_exp_plus1, MulOutput[22:0]};
+wire [7:0] r_temp0_exp_plus1 = r_temp[0][30:23] + 8'd1;
+wire [31:0] r_temp0_shift_left1 = {r_temp[0][31], r_temp0_exp_plus1, r_temp[0][22:0]};
+wire [31:0] neg_r_delta = {~r_delta[31], r_delta[30:0]};
+wire [31:0] neg_mul_output = {~MulOutput[31], MulOutput[30:0]};
 //FP operation
 Mul_FP Mul_FP_0 (.clk(clk),.FP_in1(MulInput1),.FP_in2(MulInput2),.FP_out(MulOutput));
 
@@ -118,8 +149,8 @@ Divide_int #(8, 85, 8) Divide_int_0 (
     .output_scale(cbrt_scale_out)
 );
 
-wire [31:0] temp_cbrt_re = {r_delta_1[31], r_delta_1[30:23] != 0 ? r_delta_1[30:23] - 8'd1 : 0, r_delta_1[22:0]};
-wire [31:0] temp_cbrt_im = {r_sqrt_output[31], r_sqrt_output[30:23] != 0 ? r_sqrt_output[30:23] - 8'd1 : 0, r_sqrt_output[22:0]};
+wire [31:0] temp_cbrt_re = {r_delta_1[31], r_delta_1_exp_minus1, r_delta_1[22:0]};
+wire [31:0] temp_cbrt_im = {r_sqrt_output[31], r_sqrt_output_exp_minus1, r_sqrt_output[22:0]};
 
 function [31:0] fp_neg;
     input [31:0] value;
@@ -195,20 +226,20 @@ always @(*) begin
         end
         STANDARDIZE: begin
             if(delay_count == 0) begin
-                AddInput1 = {r_a[31], r_a[30:23] + 8'd1, r_a[22:0]};
+                AddInput1 = r_a_shift_left1;
                 AddInput2 = r_a;
             end
             if(delay_count == 5) begin
                 DivInput1 = r_b;
-                DivInput2 = {~AddOutput[31], AddOutput[30:0]};
+                DivInput2 = neg_add_output;
             end
             if(delay_count == 6) begin
                 DivInput1 = r_c;
-                DivInput2 = {~r_a[31], r_a[30:0]};
+                DivInput2 = neg_r_a;
             end
             if(delay_count == 7) begin
                 DivInput1 = r_d;
-                DivInput2 = {~r_a[31], r_a[30:0]};
+                DivInput2 = neg_r_a;
             end
         end
         DELTA_COMPUTE: begin
@@ -224,7 +255,7 @@ always @(*) begin
             end
             // Clock 7: (r_b<<1) * MulOutput; MulOutput + r_c
             if(delay_count == 7) begin
-                MulInput1 = {r_b[31], r_b[30:23] + 8'd1, r_b[22:0]}; // r_b << 1
+                MulInput1 = r_b_shift_left1; // r_b << 1
                 MulInput2 = MulOutput;
                 AddInput1 = MulOutput;
                 AddInput2 = r_c;
@@ -241,7 +272,7 @@ always @(*) begin
             end
             // Clock 13: (AddOutput<<1) + AddOutput
             if(delay_count == 13) begin
-                AddInput1 = {AddOutput[31], AddOutput[30:23] + 8'd1, AddOutput[22:0]}; // AddOutput << 1
+                AddInput1 = add_output_shift_left1; // AddOutput << 1
                 AddInput2 = AddOutput;
             end
             // Clock 14: MulOutput -> r_temp[0]
@@ -256,7 +287,7 @@ always @(*) begin
             // Clock 19: MulOutput * (-r_delta_0<<2)
             if(delay_count == 19) begin
                 MulInput1 = MulOutput;
-                MulInput2 = {~r_delta_0[31], r_delta_0[30:23] + 8'd2, r_delta_0[22:0]};
+                MulInput2 = neg_r_delta_0_shift_left2;
             end
             // Clock 23: AddOutput * AddOutput -> r_delta_1
             if(delay_count == 23) begin
@@ -282,7 +313,7 @@ always @(*) begin
                 MulInput1 = r_sqrt_output;
                 MulInput2 = r_sqrt_output;
                 AddInput1 = r_sqrt_input;
-                AddInput2 = {r_sqrt_input[31], r_sqrt_input[30:23] + 8'd1, r_sqrt_input[22:0]};
+                AddInput2 = r_sqrt_input_shift_left1;
             end
             // Clock 7: r_temp[0] + MulOutput
             if(delay_count == 7) begin
@@ -292,7 +323,7 @@ always @(*) begin
             // Clock 8: r_temp[1] + (r_temp[1] << 1)
             if(delay_count == 8) begin
                 AddInput1 = r_temp[1];
-                AddInput2 = {r_temp[1][31], r_temp[1][30:23] + 8'd1, r_temp[1][22:0]};
+                AddInput2 = r_temp1_shift_left1;
             end
             // Clock 12: r_sqrt_output * AddOutput
             if(delay_count == 12) begin
@@ -334,7 +365,7 @@ always @(*) begin
             end
 
             if(delay_count == 1) begin
-                MulInput1 = {r_cbrt_re_input[31], r_cbrt_re_input[30:23] + 8'd1, r_cbrt_re_input[22:0]};
+                MulInput1 = r_cbrt_re_input_shift_left1;
                 MulInput2 = r_cbrt_re_output;
             end
 
@@ -345,7 +376,7 @@ always @(*) begin
 
             if(delay_count == 8) begin
                 MulInput1 = r_temp[0];
-                MulInput2 = {r_cbrt_re_output[31], r_cbrt_re_output[30:23] + 8'd1, r_cbrt_re_output[22:0]};
+                MulInput2 = r_cbrt_re_output_shift_left1;
             end
 
             if(delay_count == 14) begin
@@ -524,7 +555,7 @@ always @(*) begin
             if(delay_count == 0) begin
                 MulInput1 = r_C_re;
                 MulInput2 = EPSILON_RE;
-                AddInput1 = {r_C_re[31], r_C_re[30:23] + 8'd1, r_C_re[22:0]};
+                AddInput1 = r_C_re_shift_left1;
                 AddInput2 = r_b;
             end
 
@@ -534,17 +565,17 @@ always @(*) begin
             end
 
             if(delay_count == 7) begin
-                AddInput1 = {MulOutput[31], MulOutput[30:23] + 8'd1, MulOutput[22:0]};
+                AddInput1 = mul_output_shift_left1;
                 AddInput2 = r_b;
             end
 
             if(delay_count == 12) begin
-                AddInput1 = {r_temp[0][31], r_temp[0][30:23] + 8'd1, r_temp[0][22:0]};
+                AddInput1 = r_temp0_shift_left1;
                 AddInput2 = AddOutput;
             end
 
             if(delay_count == 13) begin
-                AddInput1 = {~r_temp[0][31], r_temp[0][30:23] + 8'd1, r_temp[0][22:0]};
+                AddInput1 = {~r_temp[0][31], r_temp0_exp_plus1, r_temp[0][22:0]};
                 AddInput2 = r_temp[1];
             end
         end
@@ -606,7 +637,7 @@ always @(*) begin
             end
             // Clock 24: subtract (negate MulOutput) with r_temp[1]
             if(delay_count == 24) begin
-                AddInput1 = {~MulOutput[31], MulOutput[30:0]};
+                AddInput1 = neg_mul_output;
                 AddInput2 = r_temp[1];
             end
         end
@@ -706,9 +737,9 @@ always @(posedge clk) begin
                     end
                 end
                 CASE_CHECK: begin
-                    case_index <= (r_delta[31] == 1'b1 && r_delta[30:23] != 0) ? 2'b01 : (r_delta_1[31] == 1'b1 && r_delta_0_Compare[30:23] < 2) ? 2'b10 : 2'b11;
-                    r_sqrt_input <= (case_index == 2'b01 ? {~r_delta[31], r_delta[30:0]} : r_delta);
-                    r_sqrt_output <= {1'b0, ({1'b0,r_delta[30:23]} + 9'd127)>>1, r_delta[22:0]};
+                    case_index <= (r_delta[31] == 1'b1 && r_delta[30:23] != 0) ? 2'b01 : (r_delta_1[31] == 1'b1 && r_delta_0_Compare[30:23] < 100) ? 2'b10 : 2'b11;
+                    r_sqrt_input <= (case_index == 2'b01 ? neg_r_delta : r_delta);
+                    r_sqrt_output <= sqrt_output_init;
                     iteration_count <= 5'd0;
                 end
                 Sqrt_COMPUTE: begin
@@ -766,7 +797,7 @@ always @(posedge clk) begin
                         end
                     end else if(case_index == 2'b11) begin
                         if(delay_count == 5) begin
-                            r_cbrt_re_input <= {AddOutput[31], AddOutput[30:23] != 0 ? AddOutput[30:23] - 8'd1 : 0, AddOutput[22:0]};
+                            r_cbrt_re_input <= add_output_div2;
                             r_cbrt_im_input <= 0;
                             r_cbrt_im_output <= 0;
                             delay_count <= delay_count + 1;
@@ -901,7 +932,7 @@ always @(posedge clk) begin
                     end
                     if(delay_count == 8) begin
                         FP_x1_im <= MulOutput;
-                        FP_x2_im <= {~MulOutput[31], MulOutput[30:0]};
+                        FP_x2_im <= neg_mul_output;
                     end
                     if(delay_count == 12) begin
                         FP_x1_re <= AddOutput;
@@ -945,7 +976,7 @@ always @(posedge clk) begin
                     // Clock 29: FP_x1_im := AddOutput; FP_x2_im := -AddOutput
                     if(delay_count == 29) begin
                         FP_x1_im <= AddOutput;
-                        FP_x2_im <= {~AddOutput[31], AddOutput[30:0]};
+                        FP_x2_im <= neg_add_output;
                     end
                 end
                 default: begin

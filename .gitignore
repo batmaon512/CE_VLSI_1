@@ -8,7 +8,6 @@
 *.out
 *.toc
 *.synctex.gz
-*.pdf
 
 # Allow PDFs in report graphics
 !Ring_Flasher_EX/Report/graphics/**/*.pdf

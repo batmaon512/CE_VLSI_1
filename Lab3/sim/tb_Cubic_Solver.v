@@ -33,7 +33,7 @@ module tb_Cubic_Solver;
     wire [31:0] FP_x1_im;
     wire [31:0] FP_x2_re;
     wire [31:0] FP_x2_im;
-
+    wire [127:0] FP_input = 128'hbd6f8d3ac0b32f10410200c5411edf3e;
     Cubic_Solver dut (
         .clk(clk),
         .rst_n(rst_n),
@@ -115,10 +115,10 @@ module tb_Cubic_Solver;
         $dumpvars(0, tb_Cubic_Solver);
 
         start = 1'b0;
-        FP_a = 32'h3f800000; // 1.0
-        FP_b = 32'hc0c00000; // -6.0
-        FP_c = 32'h41300000; // 11.0
-        FP_d = 32'hc0c00000; // -6.0
+        FP_a = FP_input[127:96];
+        FP_b = FP_input[95:64];
+        FP_c = FP_input[63:32];
+        FP_d = FP_input[31:0];
 
         rst_n = 1'b0;
         wait_cycles(3);
