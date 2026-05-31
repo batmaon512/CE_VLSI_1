@@ -1,21 +1,34 @@
 module Divide_int #(
     parameter WIDTH = 8,
-    parameter DIVIDER = 14'd341,
-    parameter SHIFT = 10
+    parameter DIVIDER = 21845,
+    parameter SHIFT = 16
 )(
+    input  wire             clk,
+    input  wire             rst_n,
     input  wire [WIDTH-1:0] input_scale,
     output wire [WIDTH-1:0] output_scale
 );
-    wire signed [8:0] diff = $signed({1'b0, input_scale}) - 9'sd127;
+    wire signed [8:0]  diff = $signed({1'b0, input_scale}) - 9'sd127;
     wire signed [23:0] mult_res = diff * $signed({1'b0, DIVIDER});
     wire signed [13:0] shift_res = mult_res >>> SHIFT;
     wire signed [13:0] cbrt_scale_raw = 14'sd127 + shift_res;
-    assign output_scale = cbrt_scale_raw[WIDTH-1:0];
+
+    reg [WIDTH-1:0] output_scale_r;
+
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            output_scale_r <= {WIDTH{1'b0}};
+        end else begin
+            output_scale_r <= cbrt_scale_raw[WIDTH-1:0];
+        end
+    end
+
+    assign output_scale = output_scale_r;
 endmodule
 
 module Cubic_Solver #(
     parameter Iteration_Sqrt = 10,
-    parameter Iteration_Cbrt = 10
+    parameter Iteration_Cbrt = 20
 )(
     input wire        clk,
     input wire        rst_n,
@@ -72,7 +85,7 @@ localparam  DELAY_STANDARDIZE = 7'd23,
             DELAY_DELTA_COMPUTE = 7'd35,
             DELAY_Sqrt_COMPUTE = 7'd35,
             DELAY_Cbrt_COMPUTE_R = 7'd36,
-            DELAY_Cbrt_COMPUTE_C = 7'd68,
+            DELAY_Cbrt_COMPUTE_C = 7'd74,
             DELAY_CASE1_COMPUTE = 7'd18,
             DELAY_CASE2A_COMPUTE = 7'd12,
             DELAY_CASE2B_COMPUTE = 7'd29;
@@ -98,13 +111,35 @@ Add_FP Add_FP_0 (.clk(clk),.in1(AddInput1),.in2(AddInput2),.data_out(AddOutput))
 
 Div_FP #(32) Div_FP_0 (.clk(clk),.FP_in1(DivInput1),.FP_in2(DivInput2),.FP_out(DivOutput));
 
-Divide_int #(8, 14'd341, 10) Divide_int_0 (
+Divide_int #(8, 85, 8) Divide_int_0 (
+    .clk(clk),
+    .rst_n(rst_n),
     .input_scale(cbrt_scale_in),
     .output_scale(cbrt_scale_out)
 );
 
 wire [31:0] temp_cbrt_re = {r_delta_1[31], r_delta_1[30:23] != 0 ? r_delta_1[30:23] - 8'd1 : 0, r_delta_1[22:0]};
 wire [31:0] temp_cbrt_im = {r_sqrt_output[31], r_sqrt_output[30:23] != 0 ? r_sqrt_output[30:23] - 8'd1 : 0, r_sqrt_output[22:0]};
+
+function [31:0] fp_neg;
+    input [31:0] value;
+    begin
+        fp_neg = {~value[31], value[30:0]};
+    end
+endfunction
+
+function [31:0] fp_mul2;
+    input [31:0] value;
+    begin
+        if (value[30:23] == 8'd0 || value[30:23] == 8'hFF) begin
+            fp_mul2 = value;
+        end else begin
+            fp_mul2 = {value[31], value[30:23] + 8'd1, value[22:0]};
+        end
+    end
+endfunction
+
+
 // State Transition
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
@@ -277,10 +312,10 @@ always @(*) begin
         end
         BRANCH_CHECK: begin
             if(case_index == 2'b01) begin
-                READY_BRANCH_CHECK = (delay_count == 1) ? 1'b1 : 1'b0;
+                READY_BRANCH_CHECK = (delay_count == 2) ? 1'b1 : 1'b0;
                 cbrt_scale_in = exponent_max;
             end else if(case_index == 2'b10) begin
-                READY_BRANCH_CHECK = 1'b1;
+                READY_BRANCH_CHECK = (delay_count == 1) ? 1'b1 : 1'b0;
                 cbrt_scale_in = r_delta_1[30:23];
             end else if(case_index == 2'b11) begin
                 if(delay_count == 0) begin
@@ -288,7 +323,7 @@ always @(*) begin
                     AddInput2 = r_delta_1;
                 end
                 cbrt_scale_in = r_cbrt_re_input[30:23];
-                READY_BRANCH_CHECK = (delay_count == 6) ? 1'b1 : 1'b0;
+                READY_BRANCH_CHECK = (delay_count == 7) ? 1'b1 : 1'b0;
             end
         end
 
@@ -334,6 +369,157 @@ always @(*) begin
             end
         end
 
+        Cbrt_COMPUTE_C: begin
+            case (delay_count)
+                // P^2 and S*P
+                7'd0: begin
+                    MulInput1 = r_cbrt_re_output;
+                    MulInput2 = r_cbrt_re_output;
+                end
+                7'd1: begin
+                    MulInput1 = r_cbrt_im_output;
+                    MulInput2 = r_cbrt_im_output;
+                end
+                7'd2: begin
+                    MulInput1 = r_cbrt_re_input;
+                    MulInput2 = r_cbrt_re_output;
+                end
+                7'd3: begin
+                    MulInput1 = r_cbrt_im_input;
+                    MulInput2 = r_cbrt_im_output;
+                end
+                7'd4: begin
+                    MulInput1 = r_cbrt_re_input;
+                    MulInput2 = r_cbrt_im_output;
+                end
+                7'd5: begin
+                    MulInput1 = r_cbrt_im_input;
+                    MulInput2 = r_cbrt_re_output;
+                end
+                7'd6: begin
+                    MulInput1 = fp_mul2(r_cbrt_re_output);
+                    MulInput2 = r_cbrt_im_output;
+                end
+                7'd8: begin
+                    AddInput1 = r_temp[0];
+                    AddInput2 = fp_neg(MulOutput);
+                end
+                7'd10: begin
+                    AddInput1 = r_temp[2];
+                    AddInput2 = fp_neg(MulOutput);
+                end
+                7'd12: begin
+                    AddInput1 = r_temp[3];
+                    AddInput2 = MulOutput;
+                end
+
+                // P^4 and P^3
+                7'd14: begin
+                    MulInput1 = r_temp[1];
+                    MulInput2 = r_temp[1];
+                end
+                7'd15: begin
+                    MulInput1 = r_temp[4];
+                    MulInput2 = r_temp[4];
+                end
+                7'd16: begin
+                    MulInput1 = fp_mul2(r_temp[1]);
+                    MulInput2 = r_temp[4];
+                end
+                7'd17: begin
+                    MulInput1 = r_temp[1];
+                    MulInput2 = r_cbrt_re_output;
+                end
+                7'd18: begin
+                    MulInput1 = r_temp[4];
+                    MulInput2 = r_cbrt_im_output;
+                end
+                7'd19: begin
+                    MulInput1 = r_temp[1];
+                    MulInput2 = r_cbrt_im_output;
+                end
+                7'd20: begin
+                    MulInput1 = r_temp[4];
+                    MulInput2 = r_cbrt_re_output;
+                end
+                7'd22: begin
+                    AddInput1 = r_temp[0];
+                    AddInput2 = fp_neg(MulOutput);
+                end
+                7'd25: begin
+                    AddInput1 = r_temp[6];
+                    AddInput2 = fp_neg(MulOutput);
+                end
+                7'd27: begin
+                    AddInput1 = r_temp[7];
+                    AddInput2 = MulOutput;
+                end
+                7'd28: begin
+                    AddInput1 = r_temp[8];
+                    AddInput2 = fp_mul2(r_temp[2]);
+                end
+                7'd29: begin
+                    AddInput1 = r_temp[5];
+                    AddInput2 = fp_mul2(r_temp[3]);
+                end
+                7'd31: begin
+                    AddInput1 = fp_mul2(r_temp[9]);
+                    AddInput2 = r_cbrt_re_input;
+                end
+                7'd33: begin
+                    AddInput1 = fp_mul2(r_temp[10]);
+                    AddInput2 = r_cbrt_im_input;
+                end
+
+                // Complex divide: (num_re + j*num_im) / (den_re + j*den_im)
+                7'd39: begin
+                    MulInput1 = r_temp[11];
+                    MulInput2 = r_temp[13];
+                end
+                7'd40: begin
+                    MulInput1 = r_temp[12];
+                    MulInput2 = r_temp[14];
+                end
+                7'd41: begin
+                    MulInput1 = r_temp[12];
+                    MulInput2 = r_temp[13];
+                end
+                7'd42: begin
+                    MulInput1 = r_temp[11];
+                    MulInput2 = r_temp[14];
+                end
+                7'd43: begin
+                    MulInput1 = r_temp[13];
+                    MulInput2 = r_temp[13];
+                end
+                7'd44: begin
+                    MulInput1 = r_temp[14];
+                    MulInput2 = r_temp[14];
+                end
+                7'd47: begin
+                    AddInput1 = r_temp[0];
+                    AddInput2 = MulOutput;
+                end
+                7'd49: begin
+                    AddInput1 = r_temp[1];
+                    AddInput2 = fp_neg(MulOutput);
+                end
+                7'd51: begin
+                    AddInput1 = r_temp[2];
+                    AddInput2 = MulOutput;
+                end
+                7'd57: begin
+                    DivInput1 = r_temp[15];
+                    DivInput2 = r_temp[17];
+                end
+                7'd58: begin
+                    DivInput1 = r_temp[16];
+                    DivInput2 = r_temp[17];
+                end
+                default: begin
+                end
+            endcase
+        end
         CASE1_COMPUTE: begin
             if(delay_count == 0) begin
                 MulInput1 = r_C_re;
@@ -461,6 +647,7 @@ always @(posedge clk) begin
             delay_count <= 7'd0;
             iteration_count <= 5'd0;
             case_index <= 2'd0;
+            exponent_max <= 8'd0;
         end else begin
             case(state)
                 IDLE: begin
@@ -560,18 +747,23 @@ always @(posedge clk) begin
                         if(delay_count == 0) begin
                             exponent_max <= temp_cbrt_re[30:23] > temp_cbrt_im[30:23] ? temp_cbrt_re[30:23] : temp_cbrt_im[30:23];
                             delay_count <= delay_count + 1;
-                        end
-                        if(delay_count == 1) begin
-                            r_cbrt_re_output <= {r_cbrt_re_input[31], cbrt_scale_out, r_cbrt_re_input[22:0]};
-                            r_cbrt_im_output <= {r_cbrt_im_input[31], cbrt_scale_out, r_cbrt_im_input[22:0]};
+                        end else if(delay_count == 2) begin
+                            r_cbrt_re_output <= {r_cbrt_re_input[31], r_cbrt_re_input[30:23] != 0 ? cbrt_scale_out : 8'd0 , r_cbrt_re_input[22:0]};
+                            r_cbrt_im_output <= {r_cbrt_im_input[31], r_cbrt_im_input[30:23] != 0 ? cbrt_scale_out : 8'd0, r_cbrt_im_input[22:0]};
                             delay_count <= 0;
+                        end else begin
+                            delay_count <= delay_count + 1;
                         end
                     end else if(case_index == 2'b10) begin
-                        r_cbrt_re_input <= r_delta_1;
-                        r_cbrt_im_input <= 0;
-                        r_cbrt_re_output <= {r_delta_1[31], cbrt_scale_out, r_delta_1[22:0]};
-                        r_cbrt_im_output <= 0;
-                        delay_count <= 0;
+                        if(delay_count == 0) begin
+                            r_cbrt_re_input <= r_delta_1;
+                            r_cbrt_im_input <= 0;
+                            r_cbrt_im_output <= 0;
+                            delay_count <= 1;
+                        end else begin
+                            r_cbrt_re_output <= {r_delta_1[31], cbrt_scale_out, r_delta_1[22:0]};
+                            delay_count <= 0;
+                        end
                     end else if(case_index == 2'b11) begin
                         if(delay_count == 5) begin
                             r_cbrt_re_input <= {AddOutput[31], AddOutput[30:23] != 0 ? AddOutput[30:23] - 8'd1 : 0, AddOutput[22:0]};
@@ -579,7 +771,7 @@ always @(posedge clk) begin
                             r_cbrt_im_output <= 0;
                             delay_count <= delay_count + 1;
                         end
-                        else if(delay_count == 6) begin
+                        else if(delay_count == 7) begin
                             delay_count <= 0;
                             r_cbrt_re_output <= {r_cbrt_re_input[31], cbrt_scale_out, r_cbrt_re_input[22:0]};
                         end 
@@ -618,7 +810,57 @@ always @(posedge clk) begin
                     end
                 end
                 Cbrt_COMPUTE_C: begin
-                
+                    if(delay_count == DELAY_Cbrt_COMPUTE_C | iteration_count == Iteration_Cbrt) begin
+                        delay_count <= 0;
+                        if(iteration_count < Iteration_Cbrt) begin
+                            iteration_count <= iteration_count + 1;
+                        end else begin
+                            iteration_count <= 0;
+                        end
+                    end
+                    else begin
+                        delay_count <= delay_count + 1;
+                    end
+
+                    case (delay_count)
+                        7'd7:  r_temp[0]  <= MulOutput;   // Re(P^2) partial: pr*pr
+                        7'd9:  r_temp[2]  <= MulOutput;   // Re(S*P) partial: sr*pr
+                        7'd11: r_temp[3]  <= MulOutput;   // Im(S*P) partial: sr*pi
+                        7'd13: begin
+                            r_temp[1] <= AddOutput;       // P^2 real
+                            r_temp[4] <= MulOutput;       // P^2 imag = 2*pr*pi
+                        end
+                        7'd15: r_temp[2] <= AddOutput;    // S*P real
+                        7'd17: r_temp[3] <= AddOutput;    // S*P imag
+
+                        7'd21: r_temp[0] <= MulOutput;    // P^4 real partial
+                        7'd23: r_temp[5] <= MulOutput;    // P^4 imag
+                        7'd24: r_temp[6] <= MulOutput;    // P^3 real partial
+                        7'd26: r_temp[7] <= MulOutput;    // P^3 imag partial
+                        7'd27: r_temp[8] <= AddOutput;    // P^4 real
+                        7'd30: r_temp[9] <= AddOutput;    // P^3 real
+                        7'd32: r_temp[10] <= AddOutput;   // P^3 imag
+                        7'd33: r_temp[11] <= AddOutput;   // numerator real = P^4 + 2SP
+                        7'd34: r_temp[12] <= AddOutput;   // numerator imag = P^4_im + 2SP_im
+                        7'd36: r_temp[13] <= AddOutput;   // denominator real = 2P^3 + S
+                        7'd38: r_temp[14] <= AddOutput;   // denominator imag = 2P^3 + S
+
+                        7'd46: r_temp[0] <= MulOutput;    // num_re * den_re
+                        7'd48: r_temp[1] <= MulOutput;    // num_im * den_re
+                        7'd50: r_temp[2] <= MulOutput;    // den_re^2
+                        7'd52: r_temp[15] <= AddOutput;   // division real numerator
+                        7'd54: r_temp[16] <= AddOutput;   // division imag numerator
+                        7'd56: r_temp[17] <= AddOutput;   // |den|^2
+
+                        7'd73: r_cbrt_re_output <= DivOutput;
+                        7'd74: begin 
+                            r_cbrt_im_output <= DivOutput;
+                            r_C_re <= r_cbrt_re_output;
+                            r_C_im <= DivOutput;
+                        end
+                        default: begin
+                        end
+                    endcase
                 end
                 CASE1_COMPUTE: begin
                     if(delay_count < DELAY_CASE1_COMPUTE) begin
