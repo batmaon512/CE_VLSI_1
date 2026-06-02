@@ -66,54 +66,7 @@ module tb_Cubic_Solver;
         end
     endtask
 
-    function [8*16-1:0] state_name;
-        input [3:0] s;
-        begin
-            case (s)
-                IDLE:           state_name = "IDLE";
-                STANDARDIZE:    state_name = "STANDARDIZE";
-                DELTA_COMPUTE:  state_name = "DELTA_COMPUTE";
-                CASE_CHECK:     state_name = "CASE_CHECK";
-                Sqrt_COMPUTE:   state_name = "SQRT_COMPUTE";
-                BRANCH_CHECK:   state_name = "BRANCH_CHECK";
-                Cbrt_COMPUTE_R: state_name = "CBRT_R";
-                Cbrt_COMPUTE_C: state_name = "CBRT_C";
-                CASE1_COMPUTE:  state_name = "CASE1";
-                CASE2A_COMPUTE: state_name = "CASE2A";
-                CASE2B_COMPUTE: state_name = "CASE2B";
-                DONE:           state_name = "DONE";
-                default:        state_name = "UNKNOWN";
-            endcase
-        end
-    endfunction
-
-    task automatic show_cycle;
-        begin
-            $display(
-                "[%0t] state=%s next=%s done=%b delay=%0d iter=%0d case=%0d r_a=%h r_b=%h r_c=%h r_d=%h x0=%h x1=%h x2=%h",
-                $time,
-                state_name(dut.state),
-                state_name(dut.next_state),
-                done,
-                dut.delay_count,
-                dut.iteration_count,
-                dut.case_index,
-                dut.READY_BRANCH_CHECK,
-                dut.r_a,
-                dut.r_b,
-                dut.r_c,
-                dut.r_d,
-                FP_x0_re,
-                FP_x1_re,
-                FP_x2_re
-            );
-        end
-    endtask
-
     initial begin
-        $dumpfile("Lab3/sim/tb_Cubic_Solver.vcd");
-        $dumpvars(0, tb_Cubic_Solver);
-
         start = 1'b0;
         FP_a = FP_input[127:96];
         FP_b = FP_input[95:64];
@@ -132,19 +85,14 @@ module tb_Cubic_Solver;
         begin : finish_test
             repeat (MAX_CYCLES) begin
                 @(posedge clk);
-                show_cycle();
                 if (dut.state == BRANCH_CHECK) begin
                     if (dut.iteration_count >= 2) begin
-                        $display("[%0t] Reached BRANCH_CHECK after %0d iterations, stopping simulation.", $time, dut.iteration_count);
                         wait_cycles(2);
                         disable finish_test;
                     end else begin
-                        $display("[%0t] Reached BRANCH_CHECK too early (iter=%0d), continuing...", $time, dut.iteration_count);
                     end
                 end
             end
-
-            $display("[%0t] Timeout before reaching the target state.", $time);
             $finish;
         end
     end
