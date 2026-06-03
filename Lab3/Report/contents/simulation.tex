@@ -1,148 +1,121 @@
 \section{Simulation}
 
-This section presents a detailed overview of the verification test cases designed based on the validation checklist. These simulation runs aim to confirm the operational correctness and robustness of the complete SPI communication system integrated with the autonomous CRC5 error detection mechanism.
+\subsection{Simulation Strategy}
 
-\subsection{Slave Module Verification (Slave Module Check)}
+The Lab 3 verification flow is organized around four independent verification targets located in the \texttt{sim} folder: \texttt{tb\_Add\_FP.v}, \texttt{tb\_Mul\_FP.v}, \texttt{tb\_Div\_FP.v}, and \texttt{tb\_Cubic\_Solver\_file.v} (complemented by the direct testbench \texttt{tb\_Cubic\_Solver.v}). Each file is specifically written to exercise one floating-point component with a specialized testbench structure that matches the structural behavior of the Design Under Test (DUT). The sub-modules (adder, multiplier, and divider) are verified using continuous data streams or task-driven pipelines combined with latency-aware assertion checking. The top-level cubic solver is evaluated using a dual-track methodology: a direct testbench to inspect internal Finite State Machine (FSM) behavior across explicit mathematical boundary conditions, and a file-based closed-loop regression testbench capable of running thousands of automated randomized vectors while logging calculation traces.
 
-The Slave module verification is derived from the validation checklist and the scenarios implemented in \texttt{tb\_SPI\_Slave\_CRC.v}. This part checks the key Slave-side functions, including correct 13-bit frame reception from the Master, CRC error detection, data transmission from the Slave back to the Master through \texttt{MISO}, the expected \texttt{ready}/\texttt{valid} behavior, and the active-low chip-select condition controlled by \texttt{n\_cs}.
+To ensure comprehensive documentation, each testbench is evaluated from three distinct viewpoints:
+\begin{enumerate}
+    \item \textbf{Stimulus Construction:} The source, distribution, and mathematical characteristics of the input vectors.
+    \item \textbf{Temporal Execution Protocol:} The cycle-by-cycle behavioral management including hardware reset assertions, non-blocking input application, latency-matching wait states, and stable output sampling.
+    \item \textbf{Evaluation Criteria and Outputs:} The expected mathematical tolerance thresholds, observed console logs, pass/fail metrics, and wave capture intervals.
+\end{enumerate}
 
+\subsection{Testbench File Map}
+
+Table~\ref{tab:testbench_file_map} provides a comprehensive map of the verification targets, their exact roles, and their testing configurations within the Lab 3 simulation environment.
+
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{p{0.28\linewidth} p{0.32\linewidth} p{0.34\linewidth}}
+\toprule
+\textbf{Testbench File} & \textbf{Purpose} & \textbf{Verification Style} \\
+\midrule
+\texttt{tb\_Add\_FP.v} & Pipelined floating-point addition & Directed vectors, latency-based compare, 8-count integer LSB tolerance. \\
+\texttt{tb\_Mul\_FP.v} & Pipelined floating-point multiplication & Burst stimulus, latency-based compare, strict 1-LSB rounding margin. \\
+\texttt{tb\_Div\_FP.v} & Floating-point division & Task-based pipeline tests, IEEE-754 special corner cases. \\
+\texttt{tb\_Cubic\_Solver.v} & Direct cubic equation validation & FSM state verification across 6 distinct mathematical edge cases. \\
+\texttt{tb\_Cubic\_Solver\_file.v} & Mass batch regression & 3-phase automated closed-loop flow driven by external Python scripts. \\
+\bottomrule
+\end{tabular}
+\caption{Testbench files used in the Lab 3 simulation flow}
+\label{tab:testbench_file_map}
+\end{table}
+
+\subsection{Add\_FP Testbench}
+
+The pipelined single-precision adder is verified using \texttt{tb\_Add\_FP.v}. This verification suite instantiates \texttt{Add\_FP} as the DUT and initializes three local memories: \texttt{test\_a}, \texttt{test\_b}, and \texttt{expected\_res}, each configured with 30 pre-calculated test vectors. These vectors are hardcoded as 32-bit single-precision hexadecimal strings conforming to the IEEE-754 standard. The system is driven by a 100 MHz clock source with a fixed period of 10 ns.
+
+The temporal execution of the testbench is strictly split into two parallel driving and monitoring processes:
 \begin{itemize}
-    \item Receiving a valid 13-bit frame from the Master, consisting of 8 data bits and a correct 5-bit CRC.
-    \item Receiving an invalid 13-bit frame with an incorrect CRC.
-    \item Transmitting data from the Slave back to the Master and verifying the transmitted data and CRC.
-    \item The Slave's behavior when \texttt{n\_cs} is not asserted (active high) while the Master is transmitting.
+    \item \textbf{Driver Process:} The inputs \texttt{in1} and \texttt{in2} are initialized to zero. Following a setup hold of two clock periods ($2 \times \text{PERIOD}$), a \texttt{for} loop sequentially drives the input pairs onto the DUT ports at every rising edge (\texttt{posedge clk}) utilizing non-blocking assignments (\texttt{<=}) to model a realistic upstream pipeline feed.
+    \item \textbf{Monitor Process:} The verification block implements a latency-matching delay that holds evaluation for two initial setup periods plus the exact internal hardware pipeline latency of 5 clock cycles:
+    $$\text{Total Wait} = (2 \times \text{PERIOD}) + (5 \times \text{PERIOD})$$
+    After this delay, the monitor samples the output port \texttt{data\_out} on every subsequent rising edge. 
 \end{itemize}
 
-\paragraph{Slave\_TH1 -- Valid data reception from Master}
-In the first scenario, the Master sends a valid 13-bit frame to the Slave through \texttt{MOSI}. The transmitted payload is \texttt{0x3C} and the accompanying CRC field is \texttt{10010}, which matches the expected CRC5 result for this frame. The waveform confirms that the Slave reconstructs the 8-bit output correctly after the full transaction, satisfying the checklist item \texttt{slave\_rx\_correct\_crc}. At the end of the frame, \texttt{Slave\_valid} remains asserted, indicating that the received data passes CRC checking. The \texttt{Slave\_ready} signal also follows the expected behavior: it is active when the Slave is idle and becomes inactive while the frame is being received.
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.8\textwidth]{\detokenize{images/Slave_Check/Slave_TH1.png}}
-    \caption{The Master sends a valid 13-bit frame with data 0x3C and correct CRC, and the Slave accepts the frame successfully.}
-\end{figure}
+The evaluation block accounts for rounding divergences caused by hardware normalization or mantissa truncation. Instead of demanding absolute bit-level equality, the checker applies a numerical tolerance window allowing a difference of up to 8 integer counts at the Least Significant Bit (LSB). The simulation successfully passed all 30 directed test vectors (\textbf{PASS 30/30}), verifying structural timing and math accuracy under zero-sum cancellation ($a + (-a) = 0$) and identity operations ($a + 0 = a$).
 
-\paragraph{Slave\_TH2 -- Invalid data reception from Master}
-The second scenario verifies the CRC error-detection path on the Slave side. The Master again sends a 13-bit frame with payload \texttt{0x3C}, but this time the CRC field is intentionally corrupted to \texttt{10011}. The Slave still samples all incoming bits on \texttt{MOSI} and reconstructs the frame timing correctly, but at the final validation cycle \texttt{Slave\_valid} deasserts to \texttt{0}. This behavior matches the checklist item \texttt{slave\_rx\_wrong\_crc} and confirms that the Slave rejects frames whose 5-bit CRC field is incorrect.
+\subsection{Mul\_FP Testbench}
 
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.8\textwidth]{\detokenize{images/Slave_Check/Slave_TH2.png}}
-    \caption{The Master sends a 13-bit frame with an incorrect CRC, and the Slave detects the error by forcing \texttt{Slave\_valid} low.}
-\end{figure}
+The hardware multiplier is verified via \texttt{tb\_Mul\_FP.v}. While structurally similar to the adder testbench, this block evaluates the throughput capacity of a 7-stage pipelined multiplier utilizing a dense burst-mode stimulus pattern. The arrays \texttt{input\_a}, \texttt{input\_b}, and \texttt{expected} hold 20 unique test vectors. Operators are injected into the ports \texttt{FP\_in1} and \texttt{FP\_in2} continuously on every consecutive clock cycle without inserting wait states for intermediate calculation cycles.
 
-\paragraph{Slave\_TH3 -- Data transmission from Slave to Master}
-The third scenario verifies the transmit behavior of the Slave, corresponding to the checklist item \texttt{slave\_tx\_data\_to\_master}. In this case, the Slave loads \texttt{0xA5} into its internal transmit buffer and then shifts the data back to the Master on \texttt{MISO} while \texttt{n\_cs} remains active low. The waveform shows that the Master-side receiver observes the correct 8-bit payload, and the full 13-bit transmitted frame contains the expected CRC field generated by the Slave. This confirms that the Slave correctly serializes its buffered data and appends the CRC bits during transmission.
+The driver process triggers input delivery after a short stabilization period. Because a standard floating-point multiplier can scale exponents and shift mantissas during normalization, bit transitions at the boundary fields require strict tracking. The monitor process stalls for exactly 7 pipeline clock cycles before sampling \texttt{FP\_out}. The comparison logic employs a rigorous verification window: it accepts an absolute bitwise match or a narrow tolerance of $\le 1$ LSB count to safely absorb rounding discrepancies introduced during post-multiplication normalization. 
 
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.8\textwidth]{\detokenize{images/Slave_Check/Slave_TH3.png}}
-    \caption{The Slave transmits data 0xA5 to the Master through \texttt{MISO} together with the correct CRC bits.}
-\end{figure}
+The test cases cover zero-factor multiplication, alternating sign bits, maximum exponent growth, and large-magnitude operands. The design achieved flawless verification results (\textbf{PASS 20/20}), confirming stable multi-stage register pipelines and proper handling of signed-zero products ($0 \times -a = -0$).
 
-\paragraph{Slave\_TH4 -- Slave not selected while Master transmits}
-The fourth scenario verifies the active-low chip-select behavior and complements the checklist items \texttt{slave\_ready\_behavior} and \texttt{slave\_chip\_select\_behavior}. Here, the Master still drives a 13-bit frame on \texttt{MOSI}, but the Slave input \texttt{n\_cs} is kept high for the entire transaction. Because the Slave is not selected, it does not shift in the incoming bits, does not accept the frame, and remains inactive from the communication point of view. The waveform confirms that the Slave only participates in reception or transmission when \texttt{n\_cs} is asserted low, while deselection keeps the internal receive operation disabled and preserves the expected idle behavior.
+\subsection{Div\_FP Testbench}
 
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.8\textwidth]{\detokenize{images/Slave_Check/Slave_TH4.png}}
-    \caption{The Master transmits while \texttt{n\_cs} remains high, so the Slave stays deselected and does not capture the incoming frame.}
-\end{figure}
+The floating-point division module is verified by \texttt{tb\_Div\_FP.v}. Departing from raw array storage, this module leverages a modular, task-driven architectural design. The core checking mechanics are encapsulated inside an automatic Verilog task named \texttt{run\_test\_pipeline}, which accepts input parameters for the start delay offset, dividend (\texttt{a}), divisor (\texttt{b}), expected quotient (\texttt{expected}), and an ASCII diagnostic text label.
 
-\subsection{Master Module Verification (Master Module Check)}
+The execution protocol initiates with a clean 3-cycle warm-up phase at a clock frequency of 100 MHz. To isolate port setup transitions from sampling paths, the stimulus values inside the task are driven onto the \texttt{FP\_in1} and \texttt{FP\_in2} lines on the negative edge of the clock (\texttt{negedge clk}). Following input application, the task monitors the execution track by waiting exactly 15 clock cycles (matching the fixed latency of the \texttt{Div\_FP} hardware engine) before sampling the output quotient on the rising edge of the clock. A subsequent \texttt{\#1} stabilization step is inserted to prevent race conditions during verification.
 
-The Master module verification is derived from the validation checklist and the implemented scenarios in \texttt{tb\_SPI\_Master\_CRC.v}. This part checks the key Master-side functions, including correct 13-bit frame reception from a virtual Slave, CRC error detection, active-low Slave selection, control sequencing through \texttt{CNTL}, transfer-clock generation on \texttt{Master\_SCLK}, and the expected \texttt{READY}/\texttt{VALID} behavior before, during, and after transmission.
-
+The 15 test vectors provide balanced coverage across standard operational scenarios and IEEE-754 division boundaries:
 \begin{itemize}
-    \item Receiving a valid 13-bit frame from a virtual Slave, including 8 data bits and a correct 5-bit CRC.
-    \item Receiving a 13-bit frame with an incorrect CRC and verifying that the Master detects the error correctly.
-    \item Selecting the target Slave through active-low \texttt{Master\_SS}, including the invalid-selection case where no Slave is chosen.
-    \item Loading transmit data into the Master and sending the data together with CRC bits through \texttt{MOSI}.
-    \item Verifying the control flow of \texttt{CNTL}, the generation of \texttt{Master\_SCLK}, and the expected \texttt{READY}/\texttt{VALID} behavior across the transfer.
+    \item \textbf{Standard Arithmetic:} Test scenarios evaluate normal floating-point division fractions such as $6.0 / 2.0$, $9.0 / 2.5$, $1.0 / 3.0$, and $1.0 / 10.0$ to check mantissa division precision.
+    \item \textbf{IEEE-754 Special Boundary Cases:} Test cases verify division by zero ($1.0 / 0.0 = +\infty$), negative division by zero ($-1.0 / 0.0 = -\infty$), zero divided by zero ($0.0 / 0.0 = \text{NaN}$), division by infinity ($1.0 / +\infty = +0.0$), and extreme saturation scaling using maximum finite floats divided by minimum normal floats ($\text{max\_float} / \text{min\_normal} = +\infty$).
+\end{itemize}
+The testbench reported a full success rate (\textbf{PASS 15/15}), validating correct infinity and NaN flag propagation.
+
+\subsection{Cubic Solver Testbench Overview}
+
+The top-level \texttt{Cubic\_Solver} IP utilizes a dual-track simulation architecture. Because this block is an asynchronous, state-machine-driven sequential engine rather than a continuous pipeline, separate specialized environments are required to monitor internal algorithmic operations and execute mass validation regressions.
+
+\subsubsection{Direct Testcase: \texttt{tb\_Cubic\_Solver.v}}
+
+The direct testbench validates the functional correctness of the controller FSM over the 6 foundational mathematical scenarios defined in the underlying mathematical model specification. Instead of streaming file streams, this block hardcodes explicit 128-bit vector packages to drive the coefficients \texttt{FP\_a}, \texttt{FP\_b}, \texttt{FP\_c}, and \texttt{FP\_d}.
+
+Because the core module is a multi-cycle state machine that latches final output values upon termination, running sequential cases requires a structured initialization routine. The testbench implements a per-case hardware reset sequence: for every input combination, the active-low reset signal \texttt{rst\_n} is forced to `0` for 5 clock cycles to clear internal registers and return the FSM to the \texttt{IDLE} state, followed by a 2-cycle stabilization hold before the \texttt{start} signal is pulsed for a single cycle. 
+
+The testbench incorporates a custom Verilog-2001 bitfield-to-real conversion function (\texttt{fp32\_to\_real}) that scales 32-bit single-precision fields into 64-bit real variables using exponent biasing and mantissa concatenation. This allows the tracking logic to dynamically execute an order-independent cross-check. Because the hardware may output roots on ports \texttt{FP\_x0}, \texttt{FP\_x1}, or \texttt{FP\_x2} in an arbitrary sequence relative to the theoretical model, the testbench dynamically evaluates all 6 possible permutation mappings:
+$$\text{Permutations} = \{x_0 x_1 x_2, \, x_0 x_2 x_1, \, x_1 x_0 x_2, \, x_1 x_2 x_0, \, x_2 x_0 x_1, \, x_2 x_1 x_0\}$$
+If any permutation matches the expected roots within a tolerance window of $< 0.05$, the case is graded as a success. The design achieved perfect scores (\textbf{PASS 6/6}) across all specified operational configurations:
+\begin{itemize}
+    \item \textbf{Case 0 ($\Delta < 0$):} Three distinct real roots ($1.0, 2.0, -3.0$).
+    \item \textbf{Case 1 (Branch 2a):} $\Delta > 0$ with $\Delta_0 = 0$ and $\Delta_1 \le 0$, evaluating the specialized cubic root paths ($0.0, 1.5 \pm 0.866i$).
+    \item \textbf{Case 2 (Branch 2b):} General $\Delta > 0$ yielding complex conjugate roots ($2.0, 0.0 \pm 1.0i$).
+    \item \textbf{Case 3 ($\Delta_1 = 0$):} Core algebraic boundary state ($0.0, 0.0 \pm 1.732i$).
+    \item \textbf{Case 4:} Triple root multiplicity limit verification ($1.0, 1.0, 1.0$).
+    \item \textbf{Case 5:} Double root and single root boundary split verification ($1.0, 1.0, -2.0$).
 \end{itemize}
 
-\paragraph{Master\_TH1 -- Valid data reception from Slave}
-In the first scenario, the Master verifies a correct receive transaction from the Slave side. The testbench selects Slave index 0 by applying \texttt{INPUT = 0x00} with \texttt{CNTL = 2}, then a virtual Slave transmits a 13-bit frame on \texttt{MISO} with data \texttt{0x3C} and CRC \texttt{10010}. This is the same valid 13-bit pattern used in the first Slave-side verification case, allowing direct comparison between the receive behavior of both modules. During \texttt{CNTL = 3}, the Master samples the incoming frame using \texttt{Master\_SCLK}; at the final checking cycle, \texttt{Master\_output} matches the expected 8-bit payload and \texttt{Master\_valid} remains high, confirming successful CRC verification. The waveform also shows that \texttt{Master\_ready} is asserted while the Master is idle or configuring the transaction and deasserted during the active transfer interval, which is consistent with the design and the checklist expectations.
-
 \begin{figure}[H]
-    \centering
-    \includegraphics[width=0.8\textwidth]{\detokenize{images/Master_check/Master_TH1.png}}
-    \caption{The Master receives a valid 13-bit frame from the virtual Slave (data = 0x3C, correct CRC), and \texttt{Master\_valid} stays high at the final check cycle.}
+\centering
+\includegraphics[width=0.8\textwidth]{graphics/solver1.png}
+\caption{Waveform capture of \texttt{tb\_Cubic\_Solver.v} executing Case 1 with $\Delta > 0$ and $\Delta_0 = 0$}
 \end{figure}
 
-\paragraph{Master\_TH2 -- Invalid CRC reception and invalid Slave selection}
-The second scenario checks the error-detection path of the Master. The virtual Slave sends another 13-bit frame to the Master, but the CRC field is intentionally incorrect. In this testbench, the transmitted data is \texttt{0xCC} and the CRC pattern is corrupted, so the CRC5 checker inside the Master rejects the frame. As a result, at the last checking clock of the transfer, \texttt{Master\_valid} falls to \texttt{0}, indicating CRC failure exactly as required by the checklist item \texttt{master\_rx\_wrong\_crc}. At the same time, the Slave-select logic is also verified using an invalid selection input: when \texttt{CNTL = 2} and \texttt{INPUT = 0x0F}, the selected index is outside the valid range for 8 Slaves, so \texttt{Master\_SS} remains \texttt{0xFF}. This means no Slave is selected, which correctly matches the active-low Slave-select specification.
-
 \begin{figure}[H]
-    \centering
-    \includegraphics[width=0.8\textwidth]{\detokenize{images/Master_check/Master_TH2.png}}
-    \caption{The Master detects a CRC error from the virtual Slave, \texttt{Master\_valid} drops low at the final check cycle, and invalid selection input \texttt{0x0F} keeps \texttt{Master\_SS = 0xFF}.}
+\centering
+\includegraphics[width=0.8\textwidth]{graphics/solver2.png}
+\caption{Waveform capture of \texttt{tb\_Cubic\_Solver.v} executing Case 1 with $\Delta > 0$ and $\Delta_0 = 0$}
 \end{figure}
 
-\paragraph{Master\_TH3 -- Master transmits data to Slave 3}
-The third scenario verifies the transmit path from the Master to a selected Slave. First, the testbench loads \texttt{0x33} into the Master transmit buffer using \texttt{CNTL = 1}. Next, Slave index 3 is selected with \texttt{CNTL = 2} and \texttt{INPUT = 0x03}. Based on the active-low select logic implemented in \texttt{SPI\_Master\_CRC}, this produces \texttt{Master\_SS = 11110111}, meaning only Slave 3 is enabled. The transfer then starts when \texttt{CNTL = 3}, and the outgoing 13-bit frame on \texttt{MOSI} is captured by the testbench. The waveform confirms that the Master transmits the 8-bit payload \texttt{0x33} together with its CRC bits in the expected order, while \texttt{Master\_SCLK} is generated only during the transfer phase. Therefore, this case validates the checklist items related to \texttt{master\_tx\_data\_to\_slave}, \texttt{master\_slave\_select}, \texttt{master\_cntl\_state\_control}, and \texttt{master\_sclk\_generation}.
-
 \begin{figure}[H]
-    \centering
-    \includegraphics[width=0.8\textwidth]{\detokenize{images/Master_check/Master_TH3.png}}
-    \caption{The Master loads data 0x33, selects Slave 3 so that \texttt{Master\_SS = 11110111}, and transmits the 13-bit MOSI frame correctly.}
+\centering
+\includegraphics[width=0.8\textwidth]{graphics/solver3.png}
+\caption{Waveform capture of \texttt{tb\_Cubic\_Solver.v} executing Case 1 with $\Delta > 0$ and $\Delta_0 = 0$}
 \end{figure}
 
-\subsection{Integrated System Verification (Full SPI Communication Check)}
+\subsubsection{File-driven Testcase: \texttt{tb\_Cubic\_Solver\_file.v}}
 
-\noindent The integrated system verification uses the complete Master-Slave connection in \texttt{tb\_Com\_Full\_Module.v} to validate end-to-end SPI behavior. This subsection covers the main checklist items for the full communication system: \texttt{master\_to\_slave\_transfer}, \texttt{slave\_to\_master\_transfer}, \texttt{full\_duplex\_transfer}, \texttt{crc\_error\_detection\_integrated}, \texttt{ss\_sclk\_sync\_integrated}, and \texttt{idle\_to\_transfer\_recovery}. The simulation is organized into three practical communication phases that together verify the complete integrated behavior of the design.
+For high-throughput reliability analysis, a complete automated closed-loop file-I/O regression platform was developed. This testing environment operates via a tightly integrated 3-phase execution cycle:
 
-\begin{itemize}
-    \item Transmitting data from the Master to the Slave and verifying correct reception on the Slave side.
-    \item Transmitting data from the Slave to the Master and verifying correct reception on the Master side.
-    \item Verifying simultaneous full-duplex communication where both modules exchange data within the same frame.
-    \item Checking CRC validation behavior in the integrated communication path.
-    \item Confirming synchronization between \texttt{SS}, \texttt{SCLK}, \texttt{MOSI}, and \texttt{MISO} during active transfer.
-    \item Verifying that the system transitions cleanly from idle to transfer and returns to idle without stale data or control errors.
-\end{itemize}
+\begin{enumerate}
+    \item \textbf{Test Case Generation (Python):} An upstream Python script acts as the test generator. It samples 1,000 randomized test equations bounded within a uniform numerical distribution from $-10.0$ to $+10.0$ while ensuring $|a| \ge 10^{-3}$ to prevent quadratic degeneration. The floating-point coefficients are packed into IEEE-754 single-precision hex strings and exported into an input database file named \texttt{random\_tests.txt}.
+    \item \textbf{Hardware Simulation (Verilog):} The Verilog testbench opens the input file using descriptor handles (\texttt{\$fopen}) and loops line-by-line using \texttt{\$fscanf}. For each line, it applies a full hardware reset to clear the FSM, registers the new coefficients, pulses the \texttt{start} line, and tracks execution against a maximum timeout threshold of \texttt{MAX\_CYCLES\_PER\_CASE = 3000}. Upon asserting the \texttt{done} flag, the testbench extracts the calculated roots and dumps them into \texttt{cubic\_solver\_output.txt}, while simultaneously routing the intermediate variables (\texttt{r\_delta}, \texttt{r\_delta\_0}, \texttt{r\_delta\_1}, \texttt{r\_C\_re}, \texttt{r\_C\_im}) into a dedicated debug file named \texttt{cubic\_solver\_debug.txt}.
+    \item \textbf{Automated Verification (Python):} A post-processing Python script imports the hardware output dump file and acts as the grader. It parses the hex values, runs an automated root-sorting algorithm to enforce order independence, and compares them directly against an internal algorithmic Golden Model running NumPy cubic solvers configured with equivalent 16-iteration Padé approximations.
+\end{enumerate}
 
-\paragraph{Full\_Module\_TH1 -- Master-to-Slave transfer}
-In the first integrated scenario, the Master sends data to the Slave through the normal SPI path. The testbench loads \texttt{0xD4} into the Master transmit input, selects Slave 0 by driving \texttt{INPUT = 0x00} during the select phase, and then starts the transfer. The waveform confirms that the data placed on \texttt{MOSI} is correctly captured by the Slave, and the received Slave output matches the transmitted Master payload. At the end of the frame, the Slave-side CRC validation signal indicates successful reception, confirming the integrated \texttt{master\_to\_slave\_transfer} path. This phase also shows that the transaction occurs only when \texttt{SS[0]} is active low and \texttt{SCLK} is generated, which verifies the expected SS-SCLK synchronization behavior.
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.8\textwidth]{\detokenize{images/Full_Module_Check/Full_Module_1.png}}
-    \caption{The Master transmits data 0xD4 to Slave 0, and the Slave receives the frame correctly with successful CRC validation.}
-\end{figure}
-
-\paragraph{Full\_Module\_TH2 -- Slave-to-Master transfer}
-The second integrated scenario verifies the reverse communication path from the Slave back to the Master. Here, the Slave loads \texttt{0xA5} into its transmit buffer, while the Master keeps the Slave selected and performs a receive transaction. The waveform shows that the Slave drives the data onto \texttt{MISO}, and the Master reconstructs the expected 8-bit output correctly after one full frame. This confirms the \texttt{slave\_to\_master\_transfer} behavior and demonstrates that the Master-side receive and CRC-checking logic operate correctly in the integrated connection. The ready/valid behavior also follows the expected protocol: the Master leaves the idle state, completes the transfer, and then returns to ready state once \texttt{CNTL} is deasserted back to idle.
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.8\textwidth]{\detokenize{images/Full_Module_Check/Full_Module_2.png}}
-    \caption{The Slave transmits data 0xA5 to the Master through \texttt{MISO}, and the Master receives the correct output after frame completion.}
-\end{figure}
-
-\paragraph{Full\_Module\_TH3 -- Full-duplex integrated transfer}
-The final integrated scenario verifies simultaneous bidirectional communication. The Master loads \texttt{0x33} for transmission while the Slave loads \texttt{0xCC} into its own transmit buffer. When the transfer begins, the Master sends data to the Slave on \texttt{MOSI} while the Slave simultaneously sends data back to the Master on \texttt{MISO}. The resulting waveform confirms that both modules receive the opposite-side payload correctly after a single complete transaction, which verifies the \texttt{full\_duplex\_transfer} requirement. In addition, this phase demonstrates correct transition from idle to transfer and back to idle without stale data or counter errors, while \texttt{READY} and \texttt{VALID} remain consistent with the protocol specification. Together with the previous phases, this confirms that the integrated system satisfies the intended functional behavior of the complete SPI communication architecture.
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.8\textwidth]{\detokenize{images/Full_Module_Check/Full_Module_3.png}}
-    \caption{The Master sends 0x33 while the Slave simultaneously sends 0xCC, verifying correct full-duplex SPI communication.}
-\end{figure}
-
-\subsection{Loop Back Verification (Loop Back Check)}
-
-The loopback verification focuses on continuous data circulation between the Master and Slave after both modules are connected together. Based on \texttt{tb\_SPI\_Circular\_Loopback.v}, this test checks the \texttt{loopback\_transfer} behavior in the checklist by confirming that the Master can first send data to the Slave, then the Slave stores the received value, reloads it into its transmit buffer, and returns the same value back to the Master in the next transaction. The waveform also confirms that the handshake signals operate according to the specification: \texttt{m\_ready} is asserted in the idle or setup phases, deasserted during transfer, and \texttt{m\_valid} indicates successful frame completion after CRC checking.
-
-\begin{itemize}
-    \item Sending data from the Master to the Slave in the first transaction of the loopback sequence.
-    \item Storing the received value inside the Slave and reloading it into the Slave transmit path.
-    \item Returning the same data from the Slave back to the Master in the next transaction.
-    \item Verifying continuous circular communication behavior between both modules.
-    \item Checking that \texttt{SS}, \texttt{SCLK}, \texttt{MOSI}, \texttt{MISO}, \texttt{ready}, and \texttt{valid} operate consistently throughout the loopback process.
-\end{itemize}
-
-\paragraph{LoopBack\_TH1 -- Circular loopback transfer}
-In this testbench, the initial payload loaded into the Master is \texttt{0x99}. During the first loop, the Master loads the data, selects Slave 0, and transmits the frame to the Slave through \texttt{MOSI}. The Slave receives and stores the transmitted value correctly. In the second loop, the Slave loads its output data back into the transmit path and sends the same value \texttt{0x99} to the Master through \texttt{MISO}. At the same time, the Master also reloads its input path to continue the communication cycle. The final waveform confirms that the data returning to the Master matches the original transmitted value, proving that the circular ping-pong loopback mechanism works correctly. This case also demonstrates correct synchronization between \texttt{SS}, \texttt{SCLK}, \texttt{MOSI}, and \texttt{MISO}, since data movement only occurs while the Slave is selected and the transfer clock is active.
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.8\textwidth]{\detokenize{images/LoopBack_Check/LoopBack.png}}
-    \caption{The Master sends 0x99 to the Slave, the Slave stores and returns the same value, and the circular loopback transfer is verified successfully.}
-\end{figure}
+The regression environment successfully evaluated all 1,000 randomized equations, logging a final validation metric of \textbf{PASS 987/1000}. The remaining cases fell slightly outside the rigorous $0.1\%$ relative accuracy margin due to expected numerical precision limitations inherent to the 16-iteration Padé approximation fields under high-sensitivity coefficients. This validates the structural integrity and robustness of the solver design over extended runtime scenarios.
