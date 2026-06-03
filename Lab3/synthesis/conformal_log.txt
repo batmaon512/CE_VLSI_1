@@ -1,0 +1,134 @@
+                          CONFORMAL (R)
+                   Version 24.10-s300 (06-Dec-2024) (64 bit executable)
+   Copyright (c) Cadence Design Systems, Inc., 1997-2024. All Rights Reserved
+
+
+This program is proprietary and confidential information belonging to
+Cadence Design Systems, Inc., and may be used and disclosed only as authorized
+in a license agreement controlling such use and disclosure.
+
+// Warning: This version is 543 days old. You can download the latest version from http://downloads.cadence.com.
+
+0
+CPU time     : 0.44    seconds
+Elapse time  : 104     seconds
+Memory usage : 69.75   M bytes
+// Command: read_library slow.lib -lib -revised
+// Parsing file slow.lib ...
+// Warning: (RTL9.17) Cell doesn't have any output pins or all output pins are undriven (blackboxed) (occurrence:1)
+// Note: (RTL9.26) Liberty pin with internal_node use default input_map (occurrence:16)
+// Note: Read Liberty library successfully
+0
+CPU time     : 0.64    seconds
+Elapse time  : 107     seconds
+Memory usage : 86.80   M bytes
+// Command: read_design Cubic_Solver.v -verilog -golden
+// Parsing file Cubic_Solver.v ...
+// Golden root module is set to 'Cubic_Solver'
+// Warning: (RTL1.2) Variable/signal is assigned by multiple non-blocking assignments (occurrence:2)
+// Warning: (RTL1.5a) Assignment with RHS bit width is greater than LHS bit width (occurrence:6)
+// Warning: (RTL1.5b) Potential loss of RHS msb or carry-out bit (occurrence:33)
+// Note: (RTL1.9h) Parameter declaration with no type or range specification (occurrence:33)
+// Note: (RTL5.5a) Default case item with non-X assignment(s) (occurrence:1)
+// Note: (RTL5.7) Default case item with inconsistent assignment(s). (occurrence:4)
+// Warning: (RTL7.10e) Relational comparison of different data sizes and signed operand(s) (occurrence:2)
+// Warning: (RTL7.11) Implicit signed expression is converted to unsigned (occurrence:1)
+// Warning: (RTL7.11b) Unsigned reference with index/part selection to a signed variable (occurrence:4)
+// Warning: (RTL14.1) Fanout load of the signal is removed (occurrence:51)
+// Warning: (RTL25) Non-automatic task/function (occurrence:2)
+// Note: (VLG6.4) Supported system datapath function call (occurrence:1)
+// Warning: (HRC3.6) Port connection width mis-matches. Undriven signals are floating (occurrence:8)
+// Warning: (HRC3.10a) An input port is declared, but it is not completely used in the module (occurrence:26)
+// Warning: (HRC3.15) Parameter positional association occurs in an instantiation (occurrence:2)
+// Warning: (HRC4) Multiple root modules/entities found (occurrence:1)
+// Note: Read VERILOG design successfully
+0
+CPU time     : 0.82    seconds
+Elapse time  : 119     seconds
+Memory usage : 105.48  M bytes
+// Command: read_design Cubic_Solver_m.v -verilog -revised
+// Parsing file Cubic_Solver_m.v ...
+// Revised root module is set to 'Cubic_Solver'
+// Warning: (RTL14) Signal has input but it has no output (occurrence:5)
+// Note: Read VERILOG design successfully
+0
+CPU time     : 1.53    seconds
+Elapse time  : 138     seconds
+Memory usage : 120.82  M bytes
+// Command: set_mapping_method -name only
+0
+// Command: set_system_mode lec
+// Processing Golden ...
+// Modeling Golden ...
+// Processing Revised ...
+// Modeling Revised ...
+CPU time     : 2.32    seconds
+Elapse time  : 153     seconds
+Memory usage : 163.79  M bytes
+// Warning: Golden and Revised have different numbers of key points:
+// Golden  key points = 4019
+// Revised key points = 3470
+// Mapping key points ...
+// Warning: Golden has 197 unmapped key points
+================================================================================
+Mapped points: SYSTEM class
+--------------------------------------------------------------------------------
+Mapped points     PI     PO     DFF       Total   
+--------------------------------------------------------------------------------
+Golden            131    193    3146      3470    
+--------------------------------------------------------------------------------
+Revised           131    193    3146      3470    
+================================================================================
+Unmapped points:
+================================================================================
+Golden:
+--------------------------------------------------------------------------------
+Unmapped points   DFF       Total   
+--------------------------------------------------------------------------------
+Unreachable       352       352     
+Not-mapped        197       197     
+================================================================================
+// Warning: Key point mapping is incomplete
+0
+CPU time     : 2.73    seconds
+Elapse time  : 163     seconds
+Memory usage : 166.09  M bytes
+// Command: map_key_points
+// Mapping key points ...
+// Warning: Golden has 197 unmapped key points
+================================================================================
+Mapped points: SYSTEM class
+--------------------------------------------------------------------------------
+Mapped points     PI     PO     DFF       Total   
+--------------------------------------------------------------------------------
+Golden            131    193    3146      3470    
+--------------------------------------------------------------------------------
+Revised           131    193    3146      3470    
+================================================================================
+Unmapped points:
+================================================================================
+Golden:
+--------------------------------------------------------------------------------
+Unmapped points   DFF       Total   
+--------------------------------------------------------------------------------
+Unreachable       352       352     
+Not-mapped        197       197     
+================================================================================
+// Warning: Key point mapping is incomplete
+0
+// Command: add_compared_points -all
+// Warning: Golden has 197 unmapped key points which will not be compared
+// 3339 compared points added to compare list
+0
+// Command: compare
+================================================================================
+Compared points      PO     DFF       Total   
+--------------------------------------------------------------------------------
+Equivalent           161    2599      2760    
+--------------------------------------------------------------------------------
+Non-equivalent       32     547       579     
+================================================================================
+0
+CPU time     : 42.69   seconds
+Elapse time  : 402     seconds
+Memory usage : 228.92  M bytes

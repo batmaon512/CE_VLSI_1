@@ -18,6 +18,12 @@ The generated netlist preserves the intended top-level interface of the solver, 
 
 According to \texttt{final\_area.rpt}, the synthesized top module \texttt{Cubic\_Solver} contains 17425 cells and occupies a total area of 68354.103 $\mu m^2$. The area summary is given in Table~\ref{tab:lab3_area_summary}.
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{graphics/synthesis_conformal/final_area.png}
+    \caption{Area breakdown by cell type extracted from \texttt{final\_area.rpt}}
+    \label{fig:ten_anh}
+\end{figure}
 \begin{table}[H]
 \centering
 \renewcommand{\arraystretch}{1.2}
@@ -56,7 +62,12 @@ This result is aligned with the RTL architecture. The cubic solver relies heavil
 \subsection{QoR report}
 
 The quality-of-results summary extracted from \texttt{final\_qor.rpt} shows that synthesis completed successfully for the target clock \texttt{clk} with a period of 10000 ps. The timing-related QoR metrics are shown in Table~\ref{tab:lab3_qor_timing}.
-
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{graphics/synthesis_conformal/final_qor.png}
+    \caption{QoR breakdown by cell type extracted from \texttt{final\_qor.rpt}}
+    \label{fig:ten_anh}
+\end{figure}
 \begin{table}[H]
 \centering
 \renewcommand{\arraystretch}{1.2}
@@ -76,7 +87,12 @@ Violating paths & 0 & clean timing closure \\
 \end{table}
 
 The structural instance statistics reported by Genus are summarized in Table~\ref{tab:lab3_qor_instances}.
-
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{graphics/synthesis_conformal/final_time.png}
+    \caption{Timing breakdown by cell type extracted from \texttt{final\_time.rpt}}
+    \label{fig:ten_anh}
+\end{figure}
 \begin{table}[H]
 \centering
 \renewcommand{\arraystretch}{1.2}
@@ -126,7 +142,34 @@ From an engineering perspective, this timing result has two implications:
 \subsection{Netlist interpretation}
 
 The synthesized netlist in \texttt{Cubic\_Solver\_m.v} shows that the top module still exposes the same coefficient inputs and root outputs as the RTL version. Internally, the netlist contains the shared floating-point datapath signals such as \texttt{AddOutput}, \texttt{MulOutput}, \texttt{DivOutput}, branch-control signals such as \texttt{case\_index} and \texttt{state}, and the working registers used by the iterative solver. This confirms that synthesis preserved the intended controller-driven arithmetic organization of the design.
-
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{graphics/synthesis_conformal/syn_schematic1.jpg}
+    \caption{Synthesized netlist schematic}
+    \label{fig:ten_anh}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{graphics/synthesis_conformal/syn_schematic2.jpg}
+    \caption{Detailed synthesized netlist schematic}
+    \label{fig:ten_anh}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{graphics/synthesis_conformal/syn_schematic3.png}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{graphics/synthesis_conformal/syn_schematic4.png}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.5\textwidth]{graphics/synthesis_conformal/syn_schematic5.png}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{graphics/synthesis_conformal/syn_schematic6.png}
+\end{figure}
 \subsection{Conclusion}
 
 The synthesis result for Lab 3 demonstrates that the FP32 cubic-equation solver can be implemented successfully as a gate-level hardware system. The most important conclusions are:
