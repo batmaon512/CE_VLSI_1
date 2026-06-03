@@ -1,132 +1,111 @@
 \section{Interface}
-\subsection{Master Module}
 
-The figure below shows the top-level block diagram of the Master module, including its internal submodules and the connections between them.
-\begin{figure}[H]
-	\centering
-	\includegraphics[width=0.85\textwidth]{graphics/Tai_5.pdf}
-	\caption{Master top-level block diagram}
-	\label{fig:master_top}
-\end{figure}
-
-The main submodules are \texttt{Buf\_P2S}, \texttt{Buf\_S2P}, \texttt{crc5}, and \texttt{crc5\_checker}.
+\subsection{Top-level module: \texttt{Cubic\_Solver}}
 
 \begin{figure}[H]
-	\centering
-	\includegraphics[width=0.6\textwidth]{graphics/Tai_1.pdf}
-	\caption{\texttt{Buf\_P2S}}
-	\label{fig:buf_p2s}
+    \centering
+    \includegraphics[width=0.92\linewidth]{graphics/Cubic_Solver_Interface.pdf}
+    \caption{Interface of the \texttt{Cubic\_Solver} module.}
+    \label{fig:cubic_solver_interface}
 \end{figure}
 
-\subsubsection*{Buf\_P2S}
-\textbf{Parameter:} \texttt{N = 8} (default).\\
-\textbf{Inputs:}
-\begin{itemize}
-	\item \texttt{Input[N-1:0]}: parallel input data (N bits).
-	\item \texttt{load}: signal used to load data into the buffer.
-	\item \texttt{clk}: clock signal for data shifting.
-	\item \texttt{ena}: shift enable signal.
-\end{itemize}
-\textbf{Outputs:}
-\begin{itemize}
-	\item \texttt{Output}: serial output data (1 bit).
-	\item \texttt{Buffer[N-1:0]}: buffer content in parallel form.
-\end{itemize}
+\begin{table}[H]
+\centering
+\caption{Signal description of \texttt{Cubic\_Solver}}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|c|c|c|p{8.1cm}|}
+\hline
+\textbf{Signal} & \textbf{In/Out} & \textbf{Width} & \textbf{Description} \\ \hline
+\texttt{clk} & Input & 1 & System clock used to drive the controller and all floating-point operators. \\ \hline
+\texttt{rst\_n} & Input & 1 & Active-low reset signal. Clears all internal registers and returns the FSM to \texttt{IDLE}. \\ \hline
+\texttt{start} & Input & 1 & Handshake signal that starts one solving transaction for the current coefficient set. \\ \hline
+\texttt{done} & Output & 1 & Completion flag. Goes high when all three roots have been generated and written to output registers. \\ \hline
+\texttt{FP\_a} & Input & 32 & FP32 coefficient $a$ of the cubic equation. \\ \hline
+\texttt{FP\_b} & Input & 32 & FP32 coefficient $b$ of the cubic equation. \\ \hline
+\texttt{FP\_c} & Input & 32 & FP32 coefficient $c$ of the cubic equation. \\ \hline
+\texttt{FP\_d} & Input & 32 & FP32 coefficient $d$ of the cubic equation. \\ \hline
+\texttt{FP\_x0\_re} & Output & 32 & Real part of the first root. \\ \hline
+\texttt{FP\_x0\_im} & Output & 32 & Imaginary part of the first root. \\ \hline
+\texttt{FP\_x1\_re} & Output & 32 & Real part of the second root. \\ \hline
+\texttt{FP\_x1\_im} & Output & 32 & Imaginary part of the second root. \\ \hline
+\texttt{FP\_x2\_re} & Output & 32 & Real part of the third root. \\ \hline
+\texttt{FP\_x2\_im} & Output & 32 & Imaginary part of the third root. \\ \hline
+\end{tabular}
+\end{table}
+
+The top-level solver receives one set of cubic coefficients in IEEE-754 single precision and returns three roots in complex form. Each root is represented by a pair of independent FP32 outputs so that both real-root and complex-root cases can be handled by the same hardware interface.
+
+\subsection{Floating-point adder: \texttt{Add\_FP}}
 
 \begin{figure}[H]
-	\centering
-	\includegraphics[width=0.6\textwidth]{graphics/Tai_2.pdf}
-	\caption{\texttt{Buf\_S2P}}
-	\label{fig:buf_s2p}
+    \centering
+    \includegraphics[width=0.78\linewidth]{graphics/Add_Interface.pdf}
+    \caption{Interface of the \texttt{Add\_FP} module.}
+    \label{fig:add_interface}
 \end{figure}
 
-\subsubsection*{Buf\_S2P}
-\textbf{Parameter:} \texttt{N = 8} (default).\\
-\textbf{Inputs:}
-\begin{itemize}
-	\item \texttt{Input}: serial input data (1 bit).
-	\item \texttt{clk}: clock signal.
-	\item \texttt{ena}: shift enable signal.
-\end{itemize}
-\textbf{Outputs:}
-\begin{itemize}
-	\item \texttt{Output[N-1:0]}: parallel data after receiving all N bits.
-\end{itemize}
+\begin{table}[H]
+\centering
+\caption{Signal description of \texttt{Add\_FP}}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|c|c|c|p{8.3cm}|}
+\hline
+\textbf{Signal} & \textbf{In/Out} & \textbf{Width} & \textbf{Description} \\ \hline
+\texttt{clk} & Input & 1 & Pipeline clock of the floating-point adder. \\ \hline
+\texttt{in1} & Input & 32 & First FP32 operand. \\ \hline
+\texttt{in2} & Input & 32 & Second FP32 operand. \\ \hline
+\texttt{data\_out} & Output & 32 & FP32 addition/subtraction result after alignment, normalization and rounding. \\ \hline
+\end{tabular}
+\end{table}
+
+This module is used not only for direct additions but also for subtractive operations by changing the sign bit of one operand. In the cubic solver datapath, it is repeatedly reused to accumulate algebraic terms, create scaled versions such as $3S$ or $2P^3$, and reconstruct the final roots.
+
+\subsection{Floating-point multiplier: \texttt{Mul\_FP}}
 
 \begin{figure}[H]
-	\centering
-	\includegraphics[width=0.6\textwidth]{graphics/Tai_3.pdf}
-	\caption{\texttt{crc5}}
-	\label{fig:crc5}
+    \centering
+    \includegraphics[width=0.78\linewidth]{graphics/Mul_interface.pdf}
+    \caption{Interface of the \texttt{Mul\_FP} module.}
+    \label{fig:mul_interface}
 \end{figure}
 
-\subsubsection*{crc5}
-\textbf{Inputs:}
-\begin{itemize}
-	\item \texttt{clk}: clock signal.
-	\item \texttt{reset}: resets the CRC value to 0.
-	\item \texttt{enable}: enables CRC update.
-	\item \texttt{serial\_in}: serial input data (1 bit).
-\end{itemize}
-\textbf{Outputs:}
-\begin{itemize}
-	\item \texttt{crc\_out[4:0]}: current CRC-5 value.
-\end{itemize}
+\begin{table}[H]
+\centering
+\caption{Signal description of \texttt{Mul\_FP}}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|c|c|c|p{8.3cm}|}
+\hline
+\textbf{Signal} & \textbf{In/Out} & \textbf{Width} & \textbf{Description} \\ \hline
+\texttt{clk} & Input & 1 & Pipeline clock of the floating-point multiplier. \\ \hline
+\texttt{FP\_in1} & Input & 32 & First FP32 operand. \\ \hline
+\texttt{FP\_in2} & Input & 32 & Second FP32 operand. \\ \hline
+\texttt{FP\_out} & Output & 32 & FP32 multiplication result after mantissa multiplication, normalization and rounding. \\ \hline
+\end{tabular}
+\end{table}
+
+The multiplier is the main arithmetic engine for producing powers such as $b^2$, $b^3$, $\Delta_1^2$, $\Delta_0^3$, $P^2$, $P^3$, and for evaluating the complex products required in the cube-root branch.
+
+\subsection{Floating-point divider: \texttt{Div\_FP}}
 
 \begin{figure}[H]
-	\centering
-	\includegraphics[width=0.6\textwidth]{graphics/Tai_4.pdf}
-	\caption{\texttt{crc5\_checker}}
-	\label{fig:crc5_checker}
+    \centering
+    \includegraphics[width=0.78\linewidth]{graphics/Div_Interface.pdf}
+    \caption{Interface of the \texttt{Div\_FP} module.}
+    \label{fig:div_interface}
 \end{figure}
 
-\subsubsection*{crc5\_checker}
-\textbf{Inputs:}
-\begin{itemize}
-	\item \texttt{clk}: clock signal.
-	\item \texttt{reset}: resets the checker logic.
-	\item \texttt{enable}: enables CRC checking on the received serial stream.
-	\item \texttt{serial\_in}: serial input data (1 bit).
-\end{itemize}
-\textbf{Outputs:}
-\begin{itemize}
-	\item \texttt{data\_valid}: indicates that the received data is valid when the CRC is correct.
-	\item \texttt{check\_crc\_out[4:0]}: current checked CRC value, if observation is required.
-\end{itemize}
+\begin{table}[H]
+\centering
+\caption{Signal description of \texttt{Div\_FP}}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|c|c|c|p{8.3cm}|}
+\hline
+\textbf{Signal} & \textbf{In/Out} & \textbf{Width} & \textbf{Description} \\ \hline
+\texttt{clk} & Input & 1 & Pipeline clock of the floating-point divider. \\ \hline
+\texttt{FP\_in1} & Input & 32 & Dividend in FP32 format. \\ \hline
+\texttt{FP\_in2} & Input & 32 & Divisor in FP32 format. \\ \hline
+\texttt{FP\_out} & Output & 32 & FP32 division result generated by the radix-4 divider and round-pack logic. \\ \hline
+\end{tabular}
+\end{table}
 
-\subsection{Slave Module}
-
-The main block is \texttt{SPI\_Slave\_CRC}, which internally uses the submodules \texttt{Parallel\_to\_serial}, \texttt{serial\_to\_parallel}, \texttt{crc5}, and \texttt{crc5\_checker}.
-\begin{figure}[H]
-	\centering
-	\includegraphics[width=0.85\textwidth]{graphics/Tai_6.pdf}
-	\caption{Slave top-level block diagram}
-	\label{fig:slave_top}
-\end{figure}
-
-\subsubsection*{SPI\_Slave\_CRC}
-\textbf{Parameters:} \texttt{n=8}, \texttt{crc\_len=5}, \texttt{total\_len=n+crc\_len}, \texttt{cnum=4}, \texttt{CPOL=0}, \texttt{CPHA=0}.\\
-\textbf{Inputs:}
-\begin{itemize}
-	\item \texttt{n\_rst}: active-low reset.
-	\item \texttt{data\_in[n-1:0]}: parallel data provided by the Slave for MISO transmission.
-	\item \texttt{load}: loads data into the P2S block.
-	\item \texttt{sclk}: SPI clock from the Master.
-	\item \texttt{MOSI}: serial data from the Master.
-	\item \texttt{n\_cs}: active-low chip select.
-\end{itemize}
-\textbf{Outputs:}
-\begin{itemize}
-	\item \texttt{data\_out[n-1:0]}: received parallel data after collecting all N bits.
-	\item \texttt{MISO}: serial data returned to the Master, including payload and CRC bits.
-	\item \texttt{rx\_data\_valid}: indicates that the received data is valid when the CRC is correct.
-	\item \texttt{rx\_done}: indicates that the full frame, including data and CRC, has been received.
-	\item \texttt{crc\_out[crc\_len-1:0]}: CRC generated for the transmitted data.
-	\item \texttt{ready}: indicates that the Slave is ready for transmission or reception.
-\end{itemize}
-
-\subsubsection*{Parallel\_to\_serial}
-\textbf{Function:} converts the parallel input \texttt{data\_in[n-1:0]} into the serial stream \texttt{data\_out} when \texttt{load} and \texttt{ena} are asserted.
-
-\subsubsection*{serial\_to\_parallel}
-\textbf{Function:} captures serial input data \texttt{data\_in} and reconstructs it into parallel output \texttt{data\_out[n-1:0]} when \texttt{ena} is active.
+The divider is required by three important tasks in the design: coefficient standardization, Pad\'e iterative update, and the evaluation of $\Delta_0/C$ or complex quotients in the general Cardano branch.

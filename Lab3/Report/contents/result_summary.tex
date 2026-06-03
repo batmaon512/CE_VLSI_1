@@ -1,49 +1,22 @@
 \section{Synthesis and Results Summary}
 
-\subsection{Cadence Synthesis Flow}
+\subsection{Synthesis target and generated artifacts}
 
-The \texttt{SPI\_Top} design was synthesized using Cadence Genus. The top-level architecture connects one master module and two slave modules into a single system-level block, together with the supporting serial/parallel buffers and CRC logic.
+The RTL design of \texttt{Cubic\_Solver} was synthesized using Cadence Genus under the \texttt{slow} operating condition. The synthesized result corresponds to the Lab 3 floating-point cubic-equation solver rather than the SPI design used in earlier report drafts.
 
-
-\begin{figure}
-    \centering
-    % [Insert block diagram of SPI\_Top architecture here]
-    \includegraphics[width=1\linewidth]{graphics/SPI_Top.png}
-    \caption{Block diagram of the SPI\_Top architecture}
-    \label{fig:spi_top_arch}
-\end{figure}
-
-After synthesis, the key generated files are:
+The main generated artifacts referenced in this section are:
 \begin{itemize}
-    \item Netlist: \texttt{outputs??/\${DESIGN}\_m.v} \; (for example, \texttt{bound\_flasher\_m.v})
-    \item Area report: \texttt{reports??/final\_area.rpt}
-    \item QoR report: \texttt{reports??/final\_qor.rpt}
-    \item Timing report: \texttt{reports??/final\_time.rpt}
+    \item synthesized netlist: \texttt{Lab3/synthesis/Cubic\_Solver\_m.v}
+    \item area report: \texttt{Lab3/synthesis/final\_area.rpt}
+    \item QoR report: \texttt{Lab3/synthesis/final\_qor.rpt}
+    \item timing report: \texttt{Lab3/synthesis/final\_time.rpt}
 \end{itemize}
 
-\begin{figure}[H]
-    \centering
-    % [Insert Cadence synthesis flow diagram here]
-    \includegraphics[width=1\linewidth]{graphics/synthesic_log.png}
-    \caption{Overview of the Cadence synthesis flow for SPI\_Top}
-    \label{fig:synthesis_flow}
-\end{figure}
+The generated netlist preserves the intended top-level interface of the solver, including the control signals \texttt{clk}, \texttt{rst\_n}, \texttt{start}, \texttt{done}, the FP32 coefficient inputs \texttt{FP\_a} to \texttt{FP\_d}, and the six FP32 root outputs that represent the real and imaginary parts of three roots.
 
-\subsection{Netlist Output}
+\subsection{Area report}
 
-The synthesized netlist describes the structural implementation of \texttt{SPI\_Top} after logic optimization. It includes the master block, slave blocks, CRC logic, and the required multiplexing and control paths. This file is the main reference for the final gate-level structure.
-
-\begin{figure}[H]
-    \centering
-    % [Insert netlist screenshot or file browser view here]
-    \includegraphics[width=1\linewidth]{graphics/final_.png}
-    \caption{Generated netlist file after synthesis}
-    \label{fig:netlist_output}
-\end{figure}
-
-\subsection{Area Report}
-
-The area report shows the compactness of the synthesized design. According to \texttt{final\_area.rpt}, the top module occupies 246 cells with a total area of 1231.254 $\mu m^2$.
+According to \texttt{final\_area.rpt}, the synthesized top module \texttt{Cubic\_Solver} contains 17425 cells and occupies a total area of 68354.103 $\mu m^2$. The area summary is given in Table~\ref{tab:lab3_area_summary}.
 
 \begin{table}[H]
 \centering
@@ -52,128 +25,116 @@ The area report shows the compactness of the synthesized design. According to \t
 \toprule
 \textbf{Metric} & \textbf{Value} & \textbf{Unit} \\
 \midrule
-Cell Count & 246 & cells \\
-Cell Area & 933.660 & $\mu m^2$ \\
-Net Area & 297.594 & $\mu m^2$ \\
-Total Area & 1231.254 & $\mu m^2$ \\
+Cell Count & 17425 & cells \\
+Cell Area & 46472.448 & $\mu m^2$ \\
+Net Area & 21881.656 & $\mu m^2$ \\
+Total Area & 68354.103 & $\mu m^2$ \\
 \bottomrule
 \end{tabular}
 \caption{Area summary extracted from \texttt{final\_area.rpt}}
+\label{tab:lab3_area_summary}
 \end{table}
 
-\begin{figure}[H]
-    \centering
-    % [Insert area report screenshot here]
-    \includegraphics[width=1\linewidth]{graphics/final_area.png}
-    \caption{Cadence area report for SPI\_Top}
-    \label{fig:area_report}
-\end{figure}
+The same report also identifies the divider instance \texttt{Div\_FP\_0} as the dominant arithmetic block in the design. Its local contribution is summarized in Table~\ref{tab:lab3_div_area}.
 
-Instance breakdown from the QoR summary:
-\begin{itemize}
-    \item Leaf Instance Count: 246
-    \item Sequential Instance Count: 84
-    \item Combinational Instance Count: 162
-    \item Hierarchical Instance Count: 0
-\end{itemize}
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{lrrr}
+\toprule
+\textbf{Instance} & \textbf{Cell Count} & \textbf{Cell Area} & \textbf{Total Area} \\
+\midrule
+\texttt{Div\_FP\_0} & 8251 & 19824.560 & 29162.660 \\
+\bottomrule
+\end{tabular}
+\caption{Area contribution of the divider submodule from \texttt{final\_area.rpt}}
+\label{tab:lab3_div_area}
+\end{table}
 
-\subsection{QoR Report}
+This result is aligned with the RTL architecture. The cubic solver relies heavily on division during coefficient normalization, Pad\'e square-root iteration, Pad\'e cube-root iteration, and root reconstruction. As a consequence, the divider becomes the largest synthesized block.
 
-The QoR report summarizes the overall synthesis quality. For this design, the REFCLK group shows no violating paths, and the critical slack is positive. The design therefore meets timing at the synthesized operating point.
+\subsection{QoR report}
+
+The quality-of-results summary extracted from \texttt{final\_qor.rpt} shows that synthesis completed successfully for the target clock \texttt{clk} with a period of 10000 ps. The timing-related QoR metrics are shown in Table~\ref{tab:lab3_qor_timing}.
 
 \begin{table}[H]
 \centering
 \renewcommand{\arraystretch}{1.2}
 \begin{tabular}{lcc}
 \toprule
-\textbf{Group} & \textbf{Slack (ns)} & \textbf{Violating Paths} \\
+\textbf{Item} & \textbf{Value} & \textbf{Remark} \\
 \midrule
-REFCLK & 3384.2 & 0 \\
-default & No paths & 0 \\
+Clock name & \texttt{clk} & main timing group \\
+Clock period & 10000.0 & ps \\
+Critical path slack & 0.0 & ps \\
+Total negative slack & 0.0 & ps \\
+Violating paths & 0 & clean timing closure \\
 \bottomrule
 \end{tabular}
-\caption{QoR summary extracted from \texttt{final\_qor.rpt}}
+\caption{QoR timing summary extracted from \texttt{final\_qor.rpt}}
+\label{tab:lab3_qor_timing}
 \end{table}
 
-\begin{figure}[H]
-    \centering
-    % [Insert QoR report screenshot here]
-    \includegraphics[width=1\linewidth]{graphics/final_qor_1.png}
-    \includegraphics[width=1\linewidth]{graphics/final_qor_2.png}
-    \caption{Cadence QoR report for SPI\_Top}
-    \label{fig:qor_report}
-\end{figure}
-
-\subsection{Timing Report}
-
-The timing report in \texttt{final\_time.rpt} confirms that the major internal paths meet setup timing. The most critical paths are related to the master buffer registers, CRC logic, and the slave transmit paths. All reported setup checks are marked \texttt{MET}.
+The structural instance statistics reported by Genus are summarized in Table~\ref{tab:lab3_qor_instances}.
 
 \begin{table}[H]
 \centering
 \renewcommand{\arraystretch}{1.2}
 \begin{tabular}{lrr}
 \toprule
+\textbf{Metric} & \textbf{Value} & \textbf{Unit} \\
+\midrule
+Leaf Instance Count & 17425 & instances \\
+Sequential Instance Count & 3146 & instances \\
+Combinational Instance Count & 14279 & instances \\
+Hierarchical Instance Count & 1 & instance \\
+\bottomrule
+\end{tabular}
+\caption{Instance breakdown extracted from \texttt{final\_qor.rpt}}
+\label{tab:lab3_qor_instances}
+\end{table}
+
+One important observation is that the design meets timing, but the reported worst slack is exactly 0 ps. This means the implementation satisfies the current 10 ns requirement without any extra timing margin.
+
+\subsection{Timing report}
+
+The detailed timing report \texttt{final\_time.rpt} confirms that the worst setup paths are marked \texttt{MET}. The most critical paths are located inside the pipelined divider, especially around the radix-4 stages under \texttt{Div\_FP\_0/gen\_radix\_pipe[\dots]}. This confirms that the divider is not only the largest block in area, but also the timing bottleneck of the whole design.
+
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{lcc}
+\toprule
 \textbf{Timing Item} & \textbf{Value} & \textbf{Status} \\
 \midrule
-Worst setup slack & 3384 ps & MET \\
-Worst observed late external delay & 7210 ps & MET \\
-Total violating paths & 0 & PASS \\
+Timing group & \texttt{clk} & active \\
+Clock period & 10000 & ps \\
+Worst setup slack & 0 & ps \\
+Violating paths & 0 & PASS \\
 \bottomrule
 \end{tabular}
 \caption{Timing summary extracted from \texttt{final\_time.rpt}}
+\label{tab:lab3_timing_summary}
 \end{table}
 
-\begin{figure}[H]
-    \centering
-    % [Insert timing report screenshot here]
-    \includegraphics[width=1\linewidth]{graphics/final_time.png}
-    \caption{Cadence timing report for SPI\_Top}
-    \label{fig:timing_report}
-\end{figure}
+From an engineering perspective, this timing result has two implications:
+\begin{itemize}
+    \item the current Lab 3 implementation is functionally synthesizable and timing-clean at the selected clock constraint
+    \item future optimization effort should focus first on the divider datapath if a faster operating frequency or lower area is required
+\end{itemize}
 
+\subsection{Netlist interpretation}
 
-\subsection{Schematic View}
+The synthesized netlist in \texttt{Cubic\_Solver\_m.v} shows that the top module still exposes the same coefficient inputs and root outputs as the RTL version. Internally, the netlist contains the shared floating-point datapath signals such as \texttt{AddOutput}, \texttt{MulOutput}, \texttt{DivOutput}, branch-control signals such as \texttt{case\_index} and \texttt{state}, and the working registers used by the iterative solver. This confirms that synthesis preserved the intended controller-driven arithmetic organization of the design.
 
-The synthesized netlist can be visualized as a schematic to confirm the structural integrity of the design. The master block, slave blocks, and CRC logic are clearly identifiable, and the interconnections match the expected architecture.
-\begin{figure}[H]
-    \centering
-    % [Insert schematic view screenshot here]
-    \includegraphics[width=1\linewidth]{graphics/sche1.jpg}
-    \caption{Schematic view of the synthesized SPI\_Top design}
-    \label{fig:schematic_view}
-\end{figure}
-
-\begin{figure}[H]
-    \centering
-    % [Insert schematic view screenshot here]
-    \includegraphics[width=1\linewidth]{graphics/sche2.jpg}
-    \caption{More detailed schematic view of the synthesized SPI\_Top design}
-    \label{fig:detailed_schematic}
-\end{figure}
-
-\begin{figure}[H]
-    \centering
-    % [Insert schematic view screenshot here]
-    \includegraphics[width=0.5\linewidth]{graphics/sche3.jpg}
-\end{figure}
-
-\begin{figure}[H]
-    \centering
-    % [Insert schematic view screenshot here]
-    \includegraphics[width=0.5\linewidth]{graphics/sche4.jpg}
-\end{figure}
-\begin{figure}[H]
-    \centering
-    % [Insert schematic view screenshot here]
-    \includegraphics[width=0.5\linewidth]{graphics/sche5.jpg}
-\end{figure}
 \subsection{Conclusion}
 
-The Cadence synthesis results confirm that the \texttt{SPI\_Top} design is structurally compact and timing-clean. The generated netlist, area report, QoR report, and timing report all indicate that the design is ready for the next verification or implementation stage.
-
+The synthesis result for Lab 3 demonstrates that the FP32 cubic-equation solver can be implemented successfully as a gate-level hardware system. The most important conclusions are:
 \begin{itemize}
-    \item The synthesized netlist contains the expected master-slave system structure.
-    \item The area result remains compact at 1231.254 $\mu m^2$.
-    \item The QoR report shows positive slack and no violating paths.
-    \item The timing report marks all key setup checks as \texttt{MET}.
+    \item the synthesized top-level module matches the intended interface of \texttt{Cubic\_Solver}
+    \item the total synthesized area is 68354.103 $\mu m^2$ with 17425 cells
+    \item the floating-point divider is the dominant submodule in both area and timing
+    \item the design meets the 10 ns timing requirement with zero violating paths, although the worst slack is exactly 0 ps
 \end{itemize}
+
+Overall, the synthesis reports are consistent with the RTL analysis presented in previous sections: the design is arithmetic-intensive, structurally large compared with simpler control-oriented labs, and primarily limited by the complexity of the floating-point division pipeline.

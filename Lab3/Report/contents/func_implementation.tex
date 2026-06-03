@@ -1,42 +1,95 @@
 \section{Functional implementation}
 
+\subsection{Floating-point arithmetic subsystem}
 
-\subsection{PWM Generator Module}
-The \texttt{PWM} module is responsible for controlling the brightness of individual LEDs by modulating the output duty cycle based on a 3-bit input level.
+The arithmetic subsystem is the computational backbone of the solver. Instead of building a dedicated datapath for each algebraic expression, the design reuses three generic IEEE-754 single-precision modules: \texttt{Add\_FP}, \texttt{Mul\_FP}, and \texttt{Div\_FP}. This reuse reduces structural duplication and makes the overall architecture easier to verify because all high-level computations are expressed as scheduled combinations of the same operator set.
+
+\subsubsection{Adder module}
+The \texttt{Add\_FP} module performs both addition and subtraction on FP32 operands.
 \begin{itemize}[noitemsep]
-    \item \textbf{Period Management}: It utilizes a 3-bit counter, \texttt{pwm\_cnt}, which cycles from 0 to 4 to establish the pulse period (6 brightness levels: 0\%–100\%).
-    \item \textbf{Duty Cycle Logic}: The \texttt{ledout} signal is driven high whenever the current counter value is less than the specified \texttt{level}, generating a proportional duty cycle.
-    \item \textbf{Error Handling}: The module includes logic to force a 100\% duty cycle (\texttt{ledout = 1}) if the input level exceeds the maximum value of 5, preventing output glitches.
+    \item \textbf{Operand alignment}: the exponents are compared first so that the smaller mantissa can be right-shifted before accumulation.
+    \item \textbf{Unified add/sub datapath}: subtraction is implemented implicitly by changing operand signs and by using the internal \texttt{op} control signal.
+    \item \textbf{Normalization and rounding}: after mantissa accumulation, the result is normalized and packed back into IEEE-754 format.
 \end{itemize}
 
-\subsection{LED Status Module}
-The \texttt{LedStatus} module manages the brightness level of a single LED based on the current active position in the ring.
+\subsubsection{Multiplier module}
+The \texttt{Mul\_FP} module computes the product of two FP32 numbers through a pipelined mantissa multiplier followed by normalization and rounding.
 \begin{itemize}[noitemsep]
-    \item \textbf{Position Detection}: For each LED identified by \texttt{led\_id}, it compares against the Controller's output \texttt{cur} (current active position).
-    \item \textbf{Brightness Assignment}: When \texttt{cur == led\_id}, the LED is assigned the maximum brightness level (5 out of 6). Otherwise, the brightness gradually decays by decrementing its level on each clock cycle until reaching zero.
-    \item \textbf{Fading Tail Effect}: This creates a trailing effect where previously active LEDs gradually fade out, forming a visible light trail around the ring.
+    \item \textbf{Sign and exponent processing}: the output sign is obtained by XOR, while the output exponent is formed by exponent addition and bias correction.
+    \item \textbf{Mantissa product generation}: the 24-bit mantissas are multiplied with a staged partial-product architecture.
+    \item \textbf{High reuse}: the module is repeatedly used to evaluate powers, cross-products, and complex arithmetic terms during Pad\'e iterations.
 \end{itemize}
 
-\subsection{Clock Divider Module}
-The \texttt{clock\_divider\_module} scales the high-frequency system clock down to a timing interval suitable for human-perceivable LED transitions.
+\subsubsection{Divider module}
+The \texttt{Div\_FP} module evaluates one FP32 division through a radix-4 pipelined divider.
 \begin{itemize}[noitemsep]
-    \item \textbf{Dynamic Counting}: It calculates a \texttt{MAX\_COUNT} value using parameters for clock frequency (\texttt{CLK\_FREQ\_HZ}) and desired step time (\texttt{STEP\_TIME\_S}).
-    \item \textbf{Enable Control}: The timing logic is gated by an \texttt{enable\_timer} signal, ensuring the sequence only advances when active.
-    \item \textbf{Tick Generation}: Upon reaching the calculated count, it asserts a single-cycle \texttt{step\_tick} (referred to as \texttt{divclk} in the top module) to trigger state and brightness updates.
+    \item \textbf{Pre-processing}: sign, zero cases, division-by-zero, NaN, and exponent difference are identified before quotient generation.
+    \item \textbf{Radix-4 quotient generation}: each stage emits two quotient bits, which provides a predictable latency suitable for controller scheduling.
+    \item \textbf{Round-pack stage}: the quotient is converted back into a normalized IEEE-754 result before being registered at the output.
 \end{itemize}
 
-\subsection{ Controller Module}
-The \texttt{Control} module implements a Finite State Machine (FSM) to manage the movement patterns of the LED ring.
+\subsection{Main solver behavior}
+
+The \texttt{Cubic\_Solver} module is a controller-centric architecture. Its main responsibility is not to compute every formula in parallel, but to orchestrate the arithmetic modules so that the correct operands are presented to \texttt{Add\_FP}, \texttt{Mul\_FP}, and \texttt{Div\_FP} at the correct cycle offsets.
+
+Functionally, the top-level solver performs the following sequence:
+\begin{enumerate}
+    \item Capture input coefficients and standardize them by dividing with $-3a$.
+    \item Compute $\Delta_0$, $\Delta_1$, and $\Delta$.
+    \item Classify the equation into one of the three solution branches.
+    \item Execute the square-root iteration for $\sqrt{\Delta}$ or $\sqrt{-\Delta}$.
+    \item Execute the cube-root iteration in either real or complex mode to obtain $C$.
+    \item Combine $\hat{b}$, $C$, $\overline{C}$, and $\Delta_0/C$ to generate the three final roots.
+\end{enumerate}
+
+\subsection{Main control signals}
+
+The most important control intent of the design is concentrated in a small set of scheduling and branch signals. Their functional roles are summarized in Table~\ref{tab:control_signals}.
+
+\begin{table}[H]
+\centering
+\caption{Main control and scheduling signals in \texttt{Cubic\_Solver}}
+\label{tab:control_signals}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{p{3.0cm} p{2.0cm} p{1.4cm} p{8.0cm}}
+\toprule
+\textbf{Signal} & \textbf{Type} & \textbf{Width} & \textbf{Functional meaning} \\
+\midrule
+\texttt{state} & Reg & 4 & Current state of the main finite state machine. Selects the active computational phase. \\
+\texttt{next\_state} & Reg & 4 & Next-state combinational result derived from the current state, counters, and branch conditions. \\
+\texttt{case\_index} & Reg & 2 & Encodes the selected solution branch: negative discriminant, simplified real branch, or general real branch. \\
+\texttt{delay\_count} & Reg & 7 & Fine-grain schedule counter used to align operand issue with the latency of arithmetic pipelines. \\
+\texttt{iteration\_count} & Reg & 5 & Counts the number of Pad\'e iterations already completed for square-root or cube-root evaluation. \\
+\texttt{READY\_BRANCH\_CHECK} & Reg & 1 & Internal synchronization flag indicating that the branch-specific cube-root input and initial estimate are ready. \\
+\texttt{MulInput1}, \texttt{MulInput2} & Reg & 32 each & Operands dispatched to the shared floating-point multiplier at the current cycle. \\
+\texttt{AddInput1}, \texttt{AddInput2} & Reg & 32 each & Operands dispatched to the shared floating-point adder at the current cycle. \\
+\texttt{DivInput1}, \texttt{DivInput2} & Reg & 32 each & Operands dispatched to the shared floating-point divider at the current cycle. \\
+\texttt{cbrt\_scale\_in} & Reg & 8 & Exponent-related helper input used to construct the initial estimate for cube-root iteration. \\
+\texttt{exponent\_max} & Reg & 8 & Stores the larger exponent between the real and imaginary parts when a complex cube-root seed is required. \\
+\texttt{done} & Reg & 1 & Output completion flag asserted in the \texttt{DONE} state. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{The internal registers}
+
+Besides the explicit control signals, the solver uses a compact set of internal registers to hold operands and intermediate results between states:
 \begin{itemize}[noitemsep]
-    \item \textbf{State Machine}: The logic transitions through four states: \texttt{IDLE\_STATE}, \texttt{CW\_STATE} (Clockwise), \texttt{ACW\_STATE} (Anti-clockwise), and \texttt{OFF\_STATE}.
-    \item \textbf{Position Calculation}: It determines the active LED index (\texttt{cur}) by incrementing or decrementing the position register based on the current state and the \texttt{rep} (repeat) input.
-    \item \textbf{Gating Logic}: It manages the \texttt{ena\_div} signal to enable the system clock divider and monitors the \texttt{off\_all} feedback to determine when to return to the idle state.
+    \item \texttt{r\_a}, \texttt{r\_b}, \texttt{r\_c}, \texttt{r\_d}: working coefficients. After the \texttt{STANDARDIZE} state, these registers no longer contain the original input values but the normalized coefficients used by the algorithm.
+    \item \texttt{r\_delta\_0}, \texttt{r\_delta\_1}, \texttt{r\_delta}: algebraic invariants used for branch classification and final-root reconstruction.
+    \item \texttt{r\_sqrt\_input}, \texttt{r\_sqrt\_output}: operand and current estimate for Pad\'e square-root iteration.
+    \item \texttt{r\_cbrt\_re\_input}, \texttt{r\_cbrt\_im\_input}: real and imaginary parts of the cube-root operand.
+    \item \texttt{r\_cbrt\_re\_output}, \texttt{r\_cbrt\_im\_output}: current cube-root estimate.
+    \item \texttt{r\_C\_re}, \texttt{r\_C\_im}: final value of $C$ after the cube-root stage completes.
+    \item \texttt{r\_temp[0:63]}: scratchpad register bank used to preserve pipeline results across multiple delay slots in long arithmetic schedules.
 \end{itemize}
 
-\subsection{ Ring Flasher Module}
-The \texttt{Ring\_Flasher\_EX} is the top-level module that integrates the controller, clock divider, and LED drive logic.
+\subsection{Functional role of branch control}
+
+The signal \texttt{case\_index} has a central functional meaning because it determines which numerical path the hardware will follow:
 \begin{itemize}[noitemsep]
-    \item \textbf{Parallel LED Driving}: It uses a Verilog \texttt{generate} loop to instantiate a dedicated \texttt{PWM} module for every LED in the system.
-    \item \textbf{Fading Trail Implementation}: For every time step, it updates a \texttt{Level\_LED} array where the current active index is set to maximum brightness (Level 5), while all other LEDs gradually decrement their brightness level until they reach zero.
-    \item \textbf{Synchronous Integration}: It routes the \texttt{divclk} from the clock divider to drive the sequential logic of the controller and the brightness update registers.
+    \item \texttt{2'b01}: discriminant is negative, so the solver must compute a complex-valued cube root and later generate roots from $C$ and $\overline{C}$.
+    \item \texttt{2'b10}: special real branch with simplified cube-root evaluation.
+    \item \texttt{2'b11}: general real branch, where the solver computes both $C$ and $\Delta_0/C$ before forming the three roots.
 \end{itemize}
+Because all later states depend on this 2-bit decision, the \texttt{CASE\_CHECK} and \texttt{BRANCH\_CHECK} states serve as the bridge between the algebraic invariants and the branch-specific datapath schedule.

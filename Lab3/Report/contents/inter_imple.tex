@@ -1,96 +1,246 @@
-\section{Internal Implementation}
+\section{Internal implementation}
 
-This section elaborates on the internal hardware architecture, the hierarchical module decomposition, the algorithmic Finite State Machine (FSM) design, and the synchronous data shifting mechanisms of the SPI communication system integrated with a CRC5 error-checking block.
+\subsection{Overall architecture}
 
-\subsection{System Hierarchy and Structural Modeling}
-The hardware system is designed using a structural modeling approach, partitioning complex data link operations into fundamental, reusable functional blocks. The hierarchical composition of the design is as follows:
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.70\linewidth]{graphics/Cubic_Solver.pdf}
+    \caption{Internal structure of the \texttt{Cubic\_Solver} module.}
+    \label{fig:cubic_solver_internal}
+\end{figure}
+
+The hardware is organized around one shared arithmetic datapath and one supervisory finite state machine. The datapath contains three floating-point operators, a small exponent-scaling helper for cube-root initialization, and a register bank for intermediate values. The controller then issues operands to the arithmetic blocks according to a cycle-by-cycle schedule encoded by \texttt{delay\_count}.
+
+\begin{table}[H]
+\centering
+\caption{Main internal components of the cubic-solver architecture}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{p{3.0cm} p{2.0cm} p{1.4cm} p{8.0cm}}
+\toprule
+\textbf{Component} & \textbf{Signal role} & \textbf{Width} & \textbf{Description} \\
+\midrule
+\texttt{Add\_FP} & Add/sub datapath & 32 & Shared floating-point adder used in coefficient normalization, discriminant evaluation, Pad\'e iteration, and final root composition. \\
+\texttt{Mul\_FP} & Multiply datapath & 32 & Shared floating-point multiplier used for powers, scaled terms, and complex arithmetic. \\
+\texttt{Div\_FP} & Divide datapath & 32 & Shared floating-point divider used in normalization and iterative updates. \\
+\texttt{Divide\_int} & Exponent helper & 8 & Approximates exponent scaling for the cube-root initial estimate. \\
+\texttt{r\_temp[0:63]} & Scratch register bank & 32 & Stores partial results from pipeline outputs so later delay slots can reuse them. \\
+\texttt{state}/\texttt{next\_state} & FSM controller & 4 & Controls the macro-phase of the algorithm. \\
+\texttt{delay\_count} & Micro-scheduler & 7 & Aligns operator inputs with the latency of shared arithmetic units. \\
+\texttt{iteration\_count} & Iteration tracker & 5 & Counts the number of Pad\'e updates performed. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Internal implementation of the arithmetic modules}
+
+\subsubsection{\texttt{Add\_FP}}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\linewidth]{graphics/Add_FP.pdf}
+    \caption{Internal structure of the \texttt{Add\_FP} pipeline.}
+    \label{fig:add_internal}
+\end{figure}
+
+The floating-point adder is organized as a 5-stage pipeline:
 \begin{itemize}
-    \item \textbf{\texttt{SPI\_Master\_CRC}} (Master Controller with Error Checking)
-          \begin{itemize}
-              \item \texttt{Buf\_P2S}: Parallel-to-Serial buffer for transmission mapping.
-              \item \texttt{Buf\_S2P}: Serial-to-Parallel buffer for reception mapping.
-              \item \texttt{crc5}: Computes the 5-bit Cyclic Redundancy Check (CRC) checksum for the outgoing \texttt{MOSI} data stream.
-              \item \texttt{crc5\_checker}: Validates the integrity of the incoming data on the \texttt{MISO} line against transmission errors.
-          \end{itemize}
-    \item \textbf{\texttt{SPI\_Slave\_CRC}} (Peripheral Module with Error Checking)
-          \begin{itemize}
-              \item \texttt{serial\_to\_parallel}: Deserializes incoming \texttt{MOSI} bitstreams into parallel byte structures.
-              \item \texttt{Parallel\_to\_serial}: Serializes the outgoing payload onto the \texttt{MISO} interface.
-              \item \texttt{crc5}: Evaluates the CRC5 checksum for the Slave's transmitted data.
-              \item \texttt{crc5\_checker}: Decodes and verifies the payload received from the Master.
-          \end{itemize}
+    \item \textbf{Exponent comparison}: module \texttt{AFP\_Compare\_Exponents} compares the exponents of both operands, determines which mantissa must be shifted, and forwards sign and fraction fields.
+    \item \textbf{Alignment shift}: module \texttt{AFP\_Shift} right-shifts the smaller mantissa so that both operands share the same exponent domain.
+    \item \textbf{Mantissa accumulation}: module \texttt{AFP\_Add} performs either addition or subtraction depending on operand signs.
+    \item \textbf{Normalization detection}: module \texttt{AFP\_Normal} locates the leading one using a priority encoder to determine the required normalization shift.
+    \item \textbf{Packing}: module \texttt{AFP\_Rounding} adjusts the exponent, rounds the mantissa, and packs the final FP32 result.
 \end{itemize}
 
-\subsection{SPI Master Module Implementation}
+This decomposition is well suited to the cubic solver because many operations are linear combinations of previously computed terms. Instead of duplicating separate adders for each branch, the design schedules all such combinations through one deterministic pipelined unit.
 
-\subsubsection{Data Shifting Mechanism}
-The \texttt{Buf\_P2S} module is responsible for capturing parallel data from the \texttt{INPUT} bus upon the assertion of the \texttt{load} signal. The shifting process is synchronized with the transmission clock edges. During each active shift cycle (\texttt{ena} == 1), the least significant bit is pushed directly to the \texttt{Output} pin. Simultaneously, the internal array is right-shifted:
-\begin{equation}
-    \texttt{buffer[i-1]} \leftarrow \texttt{buffer[i]} \quad (\text{for } i = N-1 \text{ down to } 1)
-\end{equation}
-The most significant bit, \texttt{buffer[N-1]}, is subsequently flushed to \texttt{1'b0} to clear the register. Conversely, the \texttt{Buf\_S2P} logic continuously samples the \texttt{MISO} line, shifting the most recent bit into \texttt{buffer[N-1]} and propagating older bits downwards.
+\subsubsection{\texttt{Mul\_FP}}
 
-\subsubsection{Finite State Machine (FSM) Architecture}
-The core control unit of the Master operates as an FSM synchronized to the rising edge of the system reference clock, \texttt{REFCLK}. The machine traverses four primary operational states:
-\begin{enumerate}
-    \item \textbf{IDLE (\texttt{2'b00}):} The resting state. The \texttt{READY} and \texttt{VALID} flags are maintained HIGH. The system actively polls the \texttt{CNTL} bus from the host CPU to determine the next state transition, while holding the CRC computing engines in a reset state.
-    \item \textbf{LOAD\_DT (\texttt{2'b01}):} The data loading state. The internal \texttt{M\_load} control signal is asserted to latch the transmission byte from the \texttt{INPUT} bus into the shift register.
-    \item \textbf{LOAD\_CS (\texttt{2'b10}):} The peripheral configuration state. The value stored in the input buffer is decoded to assert the corresponding active-LOW Slave Select (\texttt{SS}) line using the following logic:
-          \begin{lstlisting}[language=Verilog]
-SS <= (buf_input < Number_Slave) ? {Number_Slave{1'b1}} & ~(1 << buf_input) 
-                                 : {Number_Slave{1'b1}};
-\end{lstlisting}
-    \item \textbf{TRANSFER (\texttt{2'b11}):} The active communication state. The \texttt{READY} flag is pulled LOW, isolating the system from external write attempts, and the internal \texttt{count} variable begins tracking the shifted bits.
-\end{enumerate}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.92\linewidth]{graphics/Mul_FP.pdf}
+    \caption{Top-level structure of the \texttt{Mul\_FP} module.}
+    \label{fig:mul_internal}
+\end{figure}
 
-\subsubsection{Frame Multiplexing and CRC Integration}
-During the \texttt{TRANSFER} state, the communication frame is extended to 13 clock cycles (8 bits payload + 5 bits CRC), corresponding to the \texttt{count} variable incrementing from 0 to \texttt{Frame\_Size + 4}.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.92\linewidth]{graphics/MFP_Mul.pdf}
+    \caption{Mantissa-multiplication core used by \texttt{Mul\_FP}.}
+    \label{fig:mfp_mul_internal}
+\end{figure}
+
+The multiplier is split into two logical parts:
 \begin{itemize}
-    \item \textbf{Data Phase (\texttt{count < Frame\_Size}):} The \texttt{MOSI} line is driven directly by the output of the \texttt{Buf\_P2S} register. The \texttt{crc5} module actively calculates the checksum of the bitstream being transmitted.
-    \item \textbf{CRC Phase (\texttt{count} $\ge$ \texttt{Frame\_Size}):} The Master shifts its multiplexer to directly output the resultant bits from the internal CRC calculation array (\texttt{crc\_out}):
-          \begin{equation}
-              \texttt{MOSI} \leftarrow \texttt{crc\_out[Frame\_Size + 4 - count]}
-          \end{equation}
+    \item \textbf{Mantissa multiplication core}: \texttt{MFP\_Mul} appends the hidden bit to both operands and multiplies the 24-bit mantissas through six partial-product stages. The helper \texttt{Mul24x4} processes four multiplier bits at a time, which creates a regular and pipeline-friendly structure.
+    \item \textbf{Normalization and rounding}: \texttt{MFP\_Norm\_Rounding} selects the correctly normalized mantissa slice, adjusts the exponent, and writes the packed FP32 output.
 \end{itemize}
 
-\subsection{SPI Slave Module Implementation}
-Unlike the Master, which relies on a complex FSM structure, the \texttt{SPI\_Slave\_CRC} module is architecturally optimized around a counter-driven execution model.
+This architecture is efficient for the current application because the solver repeatedly needs products of already normalized floating-point numbers, including powers such as $\hat{b}^2$, $\hat{b}^3$, $\Delta_0^3$, $\Delta_1^2$, and the many partial products required in complex cube-root iteration.
 
-\subsubsection{Clock Domain Synchronization}
-To natively support varying Clock Polarity (CPOL) and Clock Phase (CPHA) configurations, the module incorporates XOR-based combinational logic to synthesize the internal execution clock (\texttt{inter\_clk}):
+\subsubsection{\texttt{Div\_FP}}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\linewidth]{graphics/Div_FP.pdf}
+    \caption{Internal structure of the \texttt{Div\_FP} module.}
+    \label{fig:div_internal}
+\end{figure}
+
+The divider uses a radix-4 pipelined organization:
+\begin{itemize}
+    \item \textbf{Pre-processing stage}: sign, zero conditions, special values, tentative exponent, dividend mantissa, and divisor mantissa are formed.
+    \item \textbf{Registered radix-4 stages}: fourteen identical pipeline stages generate two quotient bits per stage by repeated compare-subtract operations.
+    \item \textbf{Round-pack stage}: \texttt{divfp\_round\_pack} applies round-to-nearest behavior and reconstructs the final FP32 result.
+\end{itemize}
+
+The fixed latency of this divider is particularly important. Since the top-level solver uses only one divider instance, the FSM can place division requests at exact delay offsets and later read the stable result from \texttt{DivOutput} without requiring dynamic issue logic.
+
+\subsection{Finite state machine}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\linewidth]{graphics/FSM.pdf}
+    \caption{Finite state machine of the \texttt{Cubic\_Solver} module.}
+    \label{fig:cubic_solver_fsm}
+\end{figure}
+
+\subsubsection{State summary}
+
+\begin{table}[H]
+\centering
+\caption{State encoding and role of the main solver FSM}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{lll p{7.8cm}}
+\toprule
+\textbf{State} & \textbf{Code} & \textbf{Phase} & \textbf{Main responsibility} \\
+\midrule
+\texttt{IDLE} & \texttt{4'b0000} & Wait & Wait for \texttt{start}, capture input coefficients, and initialize counters. \\
+\texttt{STANDARDIZE} & \texttt{4'b0001} & Pre-process & Compute normalized coefficients by dividing $b$, $c$, and $d$ by $-3a$. \\
+\texttt{DELTA\_COMPUTE} & \texttt{4'b0010} & Invariant generation & Compute $\Delta_0$, $\Delta_1$, and $\Delta$. \\
+\texttt{CASE\_CHECK} & \texttt{4'b0011} & Branch selection & Encode the solving branch into \texttt{case\_index} and initialize the square-root stage. \\
+\texttt{Sqrt\_COMPUTE} & \texttt{4'b0100} & Iteration & Run Pad\'e square-root iteration. \\
+\texttt{BRANCH\_CHECK} & \texttt{4'b0101} & Dispatch & Prepare cube-root inputs and initial estimates for the chosen branch. \\
+\texttt{Cbrt\_COMPUTE\_R} & \texttt{4'b0110} & Iteration & Run the real cube-root Pad\'e iteration. \\
+\texttt{Cbrt\_COMPUTE\_C} & \texttt{4'b0111} & Iteration & Run the complex cube-root Pad\'e iteration. \\
+\texttt{CASE1\_COMPUTE} & \texttt{4'b1000} & Output synthesis & Generate roots for the negative-discriminant branch. \\
+\texttt{CASE2A\_COMPUTE} & \texttt{4'b1001} & Output synthesis & Generate roots for the simplified real branch. \\
+\texttt{CASE2B\_COMPUTE} & \texttt{4'b1010} & Output synthesis & Generate roots for the general real branch. \\
+\texttt{DONE} & \texttt{4'b1011} & Handshake & Assert \texttt{done} and hold valid outputs. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Detailed analysis of each state}
+
+\paragraph{1. \texttt{IDLE}}
+This is the reset and wait state. The solver stores the external coefficients into \texttt{r\_a}, \texttt{r\_b}, \texttt{r\_c}, and \texttt{r\_d}, clears \texttt{delay\_count}, \texttt{iteration\_count}, and \texttt{case\_index}, and waits until \texttt{start = 1}. No arithmetic operator is actively driven in this state.
+
+\paragraph{2. \texttt{STANDARDIZE}}
+The controller converts the equation to the normalized form used by the mathematical model. At the beginning of the state, the solver computes $3a$ by adding \texttt{r\_a} and \texttt{2a}, where \texttt{2a} is produced by exponent shifting. The resulting term is negated and used as the divisor for three sequential divisions:
+\begin{itemize}
+    \item \texttt{r\_b / (-3a)}
+    \item \texttt{r\_c / (-3a)}
+    \item \texttt{r\_d / (-3a)}
+\end{itemize}
+The outputs are written back into the working coefficient registers. This state therefore converts the external polynomial description into the internal algebraic form used by all following states.
+
+\paragraph{3. \texttt{DELTA\_COMPUTE}}
+This state computes the invariants $\Delta_0$, $\Delta_1$, and $\Delta$ by a carefully scheduled sequence of multiply-add operations:
+\begin{itemize}
+    \item \textbf{Early slots}: compute $\hat{b}^2$ and $\hat{b}\hat{c}$.
+    \item \textbf{Middle slots}: form $\Delta_0 = \hat{b}^2 + \hat{c}$ and $2\hat{b}^3 + 3\hat{b}\hat{c} + 3\hat{d}$.
+    \item \textbf{Late slots}: form $\Delta_1^2$, $4\Delta_0^3$, and finally $\Delta = \Delta_1^2 - 4\Delta_0^3$.
+\end{itemize}
+The state stores partial results in \texttt{r\_temp[0]} and the final invariant values in \texttt{r\_delta\_0}, \texttt{r\_delta\_1}, \texttt{r\_delta\_0\_Compare}, and \texttt{r\_delta}.
+
+\paragraph{4. \texttt{CASE\_CHECK}}
+Once the discriminant terms are available, the solver decides which branch to execute next. The logic writes a branch code into \texttt{case\_index}, prepares the operand for square-root evaluation in \texttt{r\_sqrt\_input}, builds an exponent-based initial estimate in \texttt{r\_sqrt\_output}, and clears the iteration counter. Functionally, this state is the bridge between invariant generation and iterative numerical refinement.
+
+\paragraph{5. \texttt{Sqrt\_COMPUTE}}
+This state implements the Pad\'e update for square root:
 \begin{equation}
-    \texttt{inter\_clk} = \texttt{sclk} \oplus \texttt{CLK\_CTRL}
+P_{n+1} = P_n \cdot \frac{P_n^2 + 3S}{3P_n^2 + S}
 \end{equation}
-where $\texttt{CLK\_CTRL} = \texttt{CPOL} \oplus \texttt{CPAH}$. All serial capture and shift-out operations are executed strictly on the rising edge of \texttt{inter\_clk}, ensuring robust data boundary alignments.
+The controller dispatches arithmetic operations over multiple delay slots:
+\begin{itemize}
+    \item compute $P_n^2$,
+    \item compute $3S$,
+    \item form $P_n^2 + 3S$ and $3P_n^2 + S$,
+    \item divide the two terms after multiplying the numerator by $P_n$.
+\end{itemize}
+The new approximation is stored back into \texttt{r\_sqrt\_output}. The state loops until \texttt{iteration\_count} reaches \texttt{Iteration\_Sqrt} or the operand is sufficiently small.
 
-\subsubsection{Counter-Driven Logic and Tri-State Output}
-The module maintains an internal 4-bit \texttt{counter}. This counter evaluates incoming edges sequentially from 0 to 13 as long as the chip select (\texttt{n\_cs}) is asserted LOW. Data shifting arrays are explicitly enabled only during the first 8 payload cycles.
+\paragraph{6. \texttt{BRANCH\_CHECK}}
+This state specializes the next phase according to \texttt{case\_index}:
+\begin{itemize}
+    \item For the complex branch, it forms the real and imaginary parts of $(\Delta_1 + \sqrt{\Delta})/2$ and computes an exponent seed based on the larger component magnitude.
+    \item For the simplified real branch, it uses $\Delta_1$ directly as cube-root input.
+    \item For the general real branch, it first adds $\Delta_1$ and $\sqrt{\Delta}$, then divides by two to form the cube-root input.
+\end{itemize}
+The flag \texttt{READY\_BRANCH\_CHECK} is asserted when both the branch-specific operand and the initial estimate are ready, allowing the FSM to enter the correct cube-root state.
 
-Furthermore, to accommodate multi-slave bus topologies, the \texttt{MISO} output is guarded by a tri-state multiplexer:
+\paragraph{7. \texttt{Cbrt\_COMPUTE\_R}}
+This state evaluates the real Pad\'e cube-root update
 \begin{equation}
-    \texttt{MISO} =
-    \begin{cases}
-        \texttt{1'bz}              & \text{if } \texttt{n\_cs} = 1'b1                 \\
-        \texttt{tx\_miso\_data}    & \text{if } \texttt{counter} < Frame\_Size        \\
-        \texttt{tx\_crc\_out[...]} & \text{if } Frame\_Size \le \texttt{counter} < 13
-    \end{cases}
+P_{n+1} = P_n \cdot \frac{P_n^3 + 2S}{2P_n^3 + S}
 \end{equation}
-This effectively floats the bus when the Slave is dormant, avoiding electrical conflicts.
+The controller schedules:
+\begin{itemize}
+    \item $P_n^2$ and $P_n^3$,
+    \item $2S$ and $2P_n^3$,
+    \item the numerator and denominator sums,
+    \item the final division that yields the next approximation.
+\end{itemize}
+At the end of the iteration budget, the result is written to \texttt{r\_C\_re} while \texttt{r\_C\_im} remains zero.
 
-\subsection{Mathematical Operator: CRC5 Implementation}
-The error detection mechanism is realized via a Linear Feedback Shift Register (LFSR). The combinational logic for the polynomial feedback operates synchronously:
-\begin{lstlisting}[language=Verilog]
-assign feedback = serial_in ^ crc_out[4];
-always @(posedge clk or posedge reset) begin
-    if (reset) begin
-        crc_out <= 5'b00000;
-    end else if (enable) begin
-        crc_out[0] <= feedback;
-        crc_out[1] <= crc_out[0];
-        crc_out[2] <= crc_out[1] ^ feedback;
-        crc_out[3] <= crc_out[2];
-        crc_out[4] <= crc_out[3];
-    end
-end
-\end{lstlisting}
-The verifier module, \texttt{crc5\_checker}, streams the received serial bits through an identical LFSR framework. If the payload is uncorrupted, the residual value in the shift registers will evaluate to exactly zero at the end of the 13th cycle. This state is detected via a NOR reduction over the register array, immediately asserting the \texttt{data\_valid} flag to certify the integrity of the transaction.
+\paragraph{8. \texttt{Cbrt\_COMPUTE\_C}}
+This is the most arithmetic-intensive state because it performs Pad\'e cube-root iteration on a complex operand. The state must evaluate both the numerator $P^4 + 2SP$ and the denominator $2P^3 + S$, then perform a complex division:
+\begin{equation}
+\frac{n_r + jn_i}{d_r + jd_i}
+=
+\frac{(n_rd_r + n_id_i) + j(n_id_r - n_rd_i)}{d_r^2 + d_i^2}
+\end{equation}
+To support this process, the controller uses a large subset of \texttt{r\_temp[]} to store partial real and imaginary products such as:
+\begin{itemize}
+    \item real and imaginary parts of $P^2$,
+    \item real and imaginary parts of $SP$,
+    \item real and imaginary parts of $P^3$ and $P^4$,
+    \item the numerator and denominator of the final complex quotient.
+\end{itemize}
+This state demonstrates the main architectural idea of the project: even complex-valued iterations are realized by scheduling a small number of shared scalar FP32 arithmetic blocks.
+
+\paragraph{9. \texttt{CASE1\_COMPUTE}}
+This state generates three roots for the negative-discriminant branch. Since $C$ is complex, the solver combines \texttt{r\_C\_re}, \texttt{r\_C\_im}, and the constants $\varepsilon$ and $\varepsilon^2$ to produce
+\begin{equation}
+x_k = \hat{b} + \varepsilon^k C + \varepsilon^{2k}\overline{C}
+\end{equation}
+The outputs are written progressively into \texttt{FP\_x0\_*}, \texttt{FP\_x1\_*}, and \texttt{FP\_x2\_*} over several delay slots.
+
+\paragraph{10. \texttt{CASE2A\_COMPUTE}}
+This state handles the simplified real branch. Only one real value $C$ is needed, so the solver forms
+\begin{equation}
+x_k = \hat{b} + \varepsilon^k C
+\end{equation}
+The first root remains purely real, while the second and third roots are produced as a conjugate pair by multiplying $C$ with the real and imaginary parts of $\varepsilon$.
+
+\paragraph{11. \texttt{CASE2B\_COMPUTE}}
+This state handles the general real branch, which requires both $C$ and $\Delta_0/C$. The controller first launches the division \texttt{r\_delta\_0 / r\_C\_re}, then combines the quotient with the $\varepsilon$-scaled copies of $C$ to form:
+\begin{equation}
+x_k = \hat{b} + \varepsilon^k C + \varepsilon^{2k}\frac{\Delta_0}{C}
+\end{equation}
+Compared with \texttt{CASE2A\_COMPUTE}, this state is longer because it must wait for the divider output before the final root-reconstruction steps can be completed.
+
+\paragraph{12. \texttt{DONE}}
+The state asserts \texttt{done = 1} and holds all output roots stable. This allows the external environment to sample the results without ambiguity.
+
+\subsection{The general operational principle of each state}
+
+From an implementation point of view, the most important characteristic of this design is the tight coupling between FSM state and datapath issue pattern:
+\begin{itemize}
+    \item \textbf{State selection} determines the current algorithmic phase.
+    \item \textbf{\texttt{delay\_count}} determines which arithmetic expression inside that phase is active at the current cycle.
+    \item \textbf{\texttt{MulInput*}, \texttt{AddInput*}, and \texttt{DivInput*}} are assigned combinationally from the current state and delay slot.
+    \item \textbf{Pipeline outputs} are sampled later into \texttt{r\_temp[]} or dedicated registers once the expected arithmetic latency has elapsed.
+\end{itemize}
+
+This means that the solver behaves like a microprogrammed datapath: the FSM chooses the algorithmic branch, while \texttt{delay\_count} plays the role of a local instruction pointer that sequences operand issue and result capture. That organization is the key reason why a relatively small set of arithmetic modules can implement a much more complex cubic-equation solver.

@@ -10,19 +10,23 @@
 \usepackage{booktabs}
 \usepackage{multirow}
 \usepackage{array}
+\usepackage{amsmath}
+\usepackage{listings}
 
 % Configuration
 \newcommand{\var}[1]{\textbf{#1}}
 \DeclareRobustCommand{\code}[1]{\begingroup\def\_{\textunderscore\allowbreak}\textsf{#1}\endgroup}
 \renewcommand{\texttt}[1]{\code{#1}}
+\addto\captionsvietnamese{\renewcommand{\contentsname}{Table of Contents}}
 \setlist[itemize]{leftmargin=2.2em,label=--,labelsep=0.6em,itemsep=0.35em,topsep=0.35em,parsep=0pt,partopsep=0pt,align=left}
+\lstset{basicstyle=\ttfamily\small,breaklines=true,frame=single,columns=fullflexible}
 \upperuniname{VIETNAM NATIONAL UNIVERSITY HO CHI MINH CITY}
 \uniname{HO CHI MINH CITY UNIVERSITY OF TECHNOLOGY}
 \deptname{FACULTY OF COMPUTER SCIENCE AND ENGINEERING}
 
 \coursename{\LARGE Logic Design \\ \large (CO3097)}
-\reporttype{\Large Report Lab 2}
-\title{\Large SPI Protocol Module}
+\reporttype{\Large Report Lab 3}
+\title{\Large IEEE-754 FP32 Cubic Equation Solver}
 
 \advisor{
 Ton Huynh Long
@@ -41,11 +45,11 @@ Ton Huynh Long
 \pagestyle{fancy}
 \pagebreak
 
-% \include{contents/interface}
-% \include{contents/FSM}
-% \include{contents/func_implementation}
-% \include{contents/inter_imple}
+\include{contents/theory}
+\include{contents/interface}
+\include{contents/func_implementation}
+\include{contents/inter_imple}
 \include{contents/simulation}
-% \include{contents/result_summary}
+\include{contents/result_summary}
 
 \end{document}
