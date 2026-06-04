@@ -42,16 +42,36 @@ The hardware is organized around one shared arithmetic datapath and one supervis
     \label{fig:add_internal}
 \end{figure}
 
-The floating-point adder is organized as a 5-stage pipeline:
+The proposed floating-point adder is compliant with the IEEE-754 single-precision format and is implemented as a 5-stage pipeline. Instead of performing all operations in one large combinational block, the datapath is decomposed into smaller functional stages so that alignment, arithmetic, and normalization can be handled in an orderly and timing-friendly manner. The operation of each stage is summarized as follows:
 \begin{itemize}
-    \item \textbf{Exponent comparison}: module \texttt{AFP\_Compare\_Exponents} compares the exponents of both operands, determines which mantissa must be shifted, and forwards sign and fraction fields.
-    \item \textbf{Alignment shift}: module \texttt{AFP\_Shift} right-shifts the smaller mantissa so that both operands share the same exponent domain.
-    \item \textbf{Mantissa accumulation}: module \texttt{AFP\_Add} performs either addition or subtraction depending on operand signs.
-    \item \textbf{Normalization detection}: module \texttt{AFP\_Normal} locates the leading one using a priority encoder to determine the required normalization shift.
-    \item \textbf{Packing}: module \texttt{AFP\_Rounding} adjusts the exponent, rounds the mantissa, and packs the final FP32 result.
+    \item \textbf{Stage 1: Exponent Comparison (\texttt{AFP\_Compare\_Exponents}).} This stage compares the exponent fields of the two operands and computes the absolute exponent difference
+    \begin{equation}
+        \delta = |E_A - E_B|
+    \end{equation}
+    to determine the alignment shift amount. At the same time, it identifies which operand has the larger exponent, preserves the sign bits, and forwards the fraction fields to the next stage.
+
+    \item \textbf{Stage 2: Mantissa Alignment (\texttt{AFP\_Shift}).} The significand of the smaller operand is right-shifted by $\delta$ positions so that both operands share the same binary-point position. The larger operand is passed forward without loss of significance. Internally, this stage also forms the effective operation mode
+    \begin{equation}
+        \texttt{op} = S_A \oplus S_B
+    \end{equation}
+    so that the next stage knows whether the mantissas must be added or subtracted.
+
+    \item \textbf{Stage 3: Arithmetic Operation (\texttt{AFP\_Add}).} The aligned mantissas are combined according to the effective operation sign. Functionally, this stage evaluates
+    \begin{equation}
+        M_{sum} = M_{large} \pm M_{shifted}
+    \end{equation}
+    and then converts the result back into sign-magnitude form. If the subtraction result is negative, the sign is inverted and the magnitude is stored as a positive number to simplify normalization.
+
+    \item \textbf{Stage 4: Normalization Detection (\texttt{AFP\_Normal}).} This stage determines whether the arithmetic result is already normalized. In subtraction cases, leading zeros may appear at the MSB side of the mantissa. A priority encoder is therefore used to detect the position of the leading one and to compute the left-shift amount needed to restore the format
+    \begin{equation}
+        1.xxxxx
+    \end{equation}
+    expected by IEEE-754.
+
+    \item \textbf{Stage 5: Normalization and Packing (\texttt{AFP\_Rounding}).} The mantissa is shifted according to the result of Stage 4, and the exponent is adjusted accordingly. If an overflow carry exists, the exponent is incremented; otherwise, it is reduced by the normalization shift amount. Finally, the result is packed back into a 32-bit IEEE-754 word.
 \end{itemize}
 
-This decomposition is well suited to the cubic solver because many operations are linear combinations of previously computed terms. Instead of duplicating separate adders for each branch, the design schedules all such combinations through one deterministic pipelined unit.
+This 5-stage organization is particularly suitable for the cubic solver because the top-level controller repeatedly issues additions such as $\Delta_0 = b^2 + c$, $\Delta = \Delta_1^2 - 4\Delta_0^3$, or the accumulation terms required by the Pad\'e iterations. A deeply regular pipeline therefore gives both structural clarity and predictable timing.
 
 \subsubsection{\texttt{Mul\_FP}}
 
@@ -69,13 +89,50 @@ This decomposition is well suited to the cubic solver because many operations ar
     \label{fig:mfp_mul_internal}
 \end{figure}
 
-The multiplier is split into two logical parts:
+To maintain high throughput and keep the critical path short, the multiplier avoids a single-cycle 24$\times$24-bit mantissa multiplication. Instead, the architecture uses a staged 4-bit nibble-decomposition strategy. The complete \texttt{Mul\_FP} block can therefore be understood as a 7-stage pipeline: 6 stages for mantissa partial-product accumulation and 1 stage for normalization and final packing.
+
+\paragraph{Pre-processing}
+Before mantissa multiplication begins, the two FP32 operands are decomposed into sign, exponent, and fraction fields. The hidden bit is appended to both fractions to form
+\begin{equation}
+M_A = \{1, frac_A\}, \qquad M_B = \{1, frac_B\}
+\end{equation}
+The tentative exponent is computed as
+\begin{equation}
+E_{raw} = E_A + E_B - 127
+\end{equation}
+and the output sign is obtained by XOR:
+\begin{equation}
+S_{out} = S_A \oplus S_B
+\end{equation}
+
+\paragraph{Partial Product Accumulation (Stages 1--6)}
+The core multiplication logic decomposes the 24-bit multiplier mantissa into six 4-bit nibbles. In each stage $i$ ($i = 0 \dots 5$), one \texttt{Mul24x4} block computes a 24$\times$4-bit partial product, and this new contribution is accumulated with the previously stored partial sum. Conceptually, the recurrence can be interpreted as
+\begin{equation}
+P_i = (P_{i-1} \ll 4) + \left(M_A \times M_B[4i+3:4i]\right)
+\end{equation}
+where each nibble contributes one radix-$2^4$ digit of the final mantissa product.
+
+The stage-by-stage meaning is:
 \begin{itemize}
-    \item \textbf{Mantissa multiplication core}: \texttt{MFP\_Mul} appends the hidden bit to both operands and multiplies the 24-bit mantissas through six partial-product stages. The helper \texttt{Mul24x4} processes four multiplier bits at a time, which creates a regular and pipeline-friendly structure.
-    \item \textbf{Normalization and rounding}: \texttt{MFP\_Norm\_Rounding} selects the correctly normalized mantissa slice, adjusts the exponent, and writes the packed FP32 output.
+    \item \textbf{Stage 1:} use \texttt{mant2\_in[3:0]} and store the first partial product in \texttt{buf\_stage1}.
+    \item \textbf{Stage 2:} use the next nibble and accumulate into \texttt{buf\_stage2}.
+    \item \textbf{Stage 3:} accumulate the contribution of bits \texttt{[11:8]} into \texttt{buf\_stage3}.
+    \item \textbf{Stage 4:} accumulate the contribution of bits \texttt{[15:12]} into \texttt{buf\_stage4}.
+    \item \textbf{Stage 5:} accumulate the contribution of bits \texttt{[19:16]} into \texttt{buf\_stage5}.
+    \item \textbf{Stage 6:} accumulate the final nibble \texttt{[23:20]} and generate the full 48-bit raw product \texttt{fra}.
 \end{itemize}
 
-This architecture is efficient for the current application because the solver repeatedly needs products of already normalized floating-point numbers, including powers such as $\hat{b}^2$, $\hat{b}^3$, $\Delta_0^3$, $\Delta_1^2$, and the many partial products required in complex cube-root iteration.
+This nibble-based organization ensures that the combinational depth of each stage remains shallow. Instead of building a large and timing-expensive multiplier tree, the architecture spreads the work across several short pipeline stages.
+
+\paragraph{Normalization and Final Packaging (Final Stage)}
+Once the raw 48-bit product has been formed, the block \texttt{MFP\_Norm\_Rounding} performs IEEE-754 post-processing:
+\begin{itemize}
+    \item \textbf{Normalization:} The block checks whether the most significant bit of the 48-bit raw product is already in normalized position. Depending on that condition, it selects either \texttt{fra[46:23]} or \texttt{fra[45:22]} as the normalized mantissa slice and updates the exponent.
+    \item \textbf{Rounding:} The least significant dropped bit is used to realize round-to-nearest behavior before the final 23-bit fraction is stored.
+    \item \textbf{Packing:} The sign, normalized exponent, and rounded mantissa are concatenated into the final FP32 result.
+\end{itemize}
+
+This architecture is efficient for the current application because the solver repeatedly needs products such as $\hat{b}^2$, $\hat{b}^3$, $\Delta_0^3$, $\Delta_1^2$, and the large set of cross-products required by the complex cube-root branch.
 
 \subsubsection{\texttt{Div\_FP}}
 
@@ -86,14 +143,59 @@ This architecture is efficient for the current application because the solver re
     \label{fig:div_internal}
 \end{figure}
 
-The divider uses a radix-4 pipelined organization:
+The division unit is designed as a radix-4 pipelined floating-point divider. Similar to the multiplier, the goal is not minimum latency in a single cycle, but rather a regular multi-stage implementation with deterministic throughput and timing behavior. The full \texttt{Div\_FP} datapath can be interpreted as a 16-cycle pipeline: 1 input stage, 14 radix-4 quotient-generation stages, and 1 output register stage.
+
+\paragraph{Stage 1: Pre-processing and operand standardization}
+The first step extracts sign, exponent, and fraction fields from the two FP32 operands. The divider then classifies special cases:
 \begin{itemize}
-    \item \textbf{Pre-processing stage}: sign, zero conditions, special values, tentative exponent, dividend mantissa, and divisor mantissa are formed.
-    \item \textbf{Registered radix-4 stages}: fourteen identical pipeline stages generate two quotient bits per stage by repeated compare-subtract operations.
-    \item \textbf{Round-pack stage}: \texttt{divfp\_round\_pack} applies round-to-nearest behavior and reconstructs the final FP32 result.
+    \item zero numerator
+    \item zero denominator
+    \item NaN / special exponent cases
+\end{itemize}
+The output sign is computed as
+\begin{equation}
+S_{out} = S_A \oplus S_B
+\end{equation}
+and the initial exponent is formed from the exponent difference between dividend and divisor. To ensure that the mantissa quotient starts in normalized range, the design compares the two mantissas:
+\begin{itemize}
+    \item if $M_A < M_B$, the dividend mantissa is left-shifted and the exponent is biased by 126
+    \item otherwise, the mantissa is used directly and the exponent is biased by 127
+\end{itemize}
+This step creates the initial remainder \texttt{pre\_rem}, divisor \texttt{pre\_div}, quotient register \texttt{pre\_quot}, and exponent \texttt{pre\_exp}.
+
+\paragraph{Stage 2: Input pipeline register}
+The standardized division operands are stored in \texttt{divfp\_input\_stage}. This stage isolates the combinational preprocessing logic from the iterative radix-4 quotient datapath and guarantees synchronous propagation of the control metadata such as sign, zero flag, division-by-zero flag, and NaN flag.
+
+\paragraph{Stages 3--16: Radix-4 quotient generation}
+The main body of the divider consists of fourteen identical registered radix-4 stages. In each stage, the combinational block \texttt{radix4\_div\_stage} performs the following operations:
+\begin{itemize}
+    \item shift the current remainder left by 2 bits
+    \item compare the shifted remainder with $2D$ and $D$
+    \item subtract the largest possible multiple without making the remainder negative
+    \item emit one quotient digit \texttt{q\_digit} in radix-4, equivalent to two binary quotient bits
 \end{itemize}
 
-The fixed latency of this divider is particularly important. Since the top-level solver uses only one divider instance, the FSM can place division requests at exact delay offsets and later read the stable result from \texttt{DivOutput} without requiring dynamic issue logic.
+If the stage remainder is denoted by $R_i$ and the divisor by $D$, then each stage evaluates
+\begin{equation}
+R_i' = 4R_i
+\end{equation}
+and chooses a quotient digit $q_i \in \{0,1,2,3\}$ such that
+\begin{equation}
+R_{i+1} = 4R_i - q_iD
+\end{equation}
+remains non-negative. The digit is appended into the running quotient register. Since each stage contributes two quotient bits, fourteen stages are sufficient to build a 28-bit quotient representation.
+
+\paragraph{Final stage: Rounding and IEEE-754 packaging}
+After the last radix-4 stage, the block \texttt{divfp\_round\_pack} reconstructs the floating-point result:
+\begin{itemize}
+    \item the quotient bits are converted into a normalized mantissa candidate
+    \item guard, round, and sticky information are used to implement round-to-nearest
+    \item the exponent is corrected if the rounding operation produces mantissa overflow
+    \item special conditions such as NaN, division by zero, overflow, and underflow are handled before final packing
+\end{itemize}
+The result is then registered once more into \texttt{FP\_out}, completing the division pipeline.
+
+The fixed latency of this divider is particularly important for the cubic solver. Since the top-level design contains only one instance of \texttt{Div\_FP}, the FSM must know exactly when a valid quotient becomes available. The regular 16-cycle structure is therefore a major advantage for state scheduling.
 
 \subsection{Finite state machine}
 
@@ -154,13 +256,36 @@ This state computes the invariants $\Delta_0$, $\Delta_1$, and $\Delta$ by a car
 The state stores partial results in \texttt{r\_temp[0]} and the final invariant values in \texttt{r\_delta\_0}, \texttt{r\_delta\_1}, \texttt{r\_delta\_0\_Compare}, and \texttt{r\_delta}.
 
 \paragraph{4. \texttt{CASE\_CHECK}}
-Once the discriminant terms are available, the solver decides which branch to execute next. The logic writes a branch code into \texttt{case\_index}, prepares the operand for square-root evaluation in \texttt{r\_sqrt\_input}, builds an exponent-based initial estimate in \texttt{r\_sqrt\_output}, and clears the iteration counter. Functionally, this state is the bridge between invariant generation and iterative numerical refinement.
+Once the discriminant terms are available, the solver decides which branch of the cubic formula must be executed next. This state is therefore the main decision point of the entire algorithm. Conceptually, the FSM divides the problem into three cases:
+\begin{itemize}
+    \item \textbf{Case 1 -- complex branch} (\texttt{case\_index = 2'b01}): selected when $\Delta < 0$. In this case, the hardware must interpret $\sqrt{\Delta}$ as a purely imaginary quantity and later perform a complex-valued cube-root iteration.
+    \item \textbf{Case 2A -- simplified real branch} (\texttt{case\_index = 2'b10}): selected when the special repeated-root condition is detected. The subsequent cube-root stage only needs a real-valued operand derived from $\Delta_1$.
+    \item \textbf{Case 2B -- general real branch} (\texttt{case\_index = 2'b11}): selected for all remaining cases. The solver must later compute both $C$ and $\Delta_0/C$ to reconstruct the final roots.
+\end{itemize}
+
+Besides selecting the branch, this state also prepares the square-root phase:
+\begin{itemize}
+    \item \texttt{r\_sqrt\_input} is loaded with either $\Delta$ or $-\Delta$, depending on whether the square root must be treated as real or imaginary.
+    \item \texttt{r\_sqrt\_output} is initialized with \texttt{sqrt\_output\_init}, which is an exponent-based first estimate derived from the operand magnitude.
+    \item \texttt{iteration\_count} is cleared so that the Pad\'e loop starts from its first iteration.
+\end{itemize}
+Functionally, \texttt{CASE\_CHECK} is the bridge between discriminant evaluation and the branch-specific numerical refinement process.
 
 \paragraph{5. \texttt{Sqrt\_COMPUTE}}
 This state implements the Pad\'e update for square root:
 \begin{equation}
 P_{n+1} = P_n \cdot \frac{P_n^2 + 3S}{3P_n^2 + S}
 \end{equation}
+Before the iterative loop starts, the initial estimate $P_0$ is not chosen arbitrarily. The RTL forms it by manipulating the exponent of the operand:
+\begin{equation}
+\texttt{sqrt\_output\_exp = ((exp(S) + 127) >> 1)}
+\end{equation}
+and then reconstructs a provisional FP32 value with the same mantissa field:
+\begin{equation}
+\texttt{sqrt\_output\_init = \{0, sqrt\_output\_exp, mantissa(S)\}}
+\end{equation}
+This is an exponent-based magnitude approximation to $\sqrt{S}$, and it provides a much better starting point than a constant seed.
+
 The controller dispatches arithmetic operations over multiple delay slots:
 \begin{itemize}
     \item compute $P_n^2$,
@@ -173,17 +298,23 @@ The new approximation is stored back into \texttt{r\_sqrt\_output}. The state lo
 \paragraph{6. \texttt{BRANCH\_CHECK}}
 This state specializes the next phase according to \texttt{case\_index}:
 \begin{itemize}
-    \item For the complex branch, it forms the real and imaginary parts of $(\Delta_1 + \sqrt{\Delta})/2$ and computes an exponent seed based on the larger component magnitude.
-    \item For the simplified real branch, it uses $\Delta_1$ directly as cube-root input.
-    \item For the general real branch, it first adds $\Delta_1$ and $\sqrt{\Delta}$, then divides by two to form the cube-root input.
+    \item For the complex branch, it forms the real and imaginary parts of $(\Delta_1 + \sqrt{\Delta})/2$ by halving \texttt{r\_delta\_1} and \texttt{r\_sqrt\_output} through exponent adjustment. The state then compares both exponents and selects the larger one as \texttt{exponent\_max} so that the complex cube-root seed has a safe magnitude.
+    \item For the simplified real branch, it uses $\Delta_1$ directly as cube-root input and initializes the imaginary path to zero.
+    \item For the general real branch, it first adds $\Delta_1$ and $\sqrt{\Delta}$, then divides by two to form the real cube-root input.
 \end{itemize}
-The flag \texttt{READY\_BRANCH\_CHECK} is asserted when both the branch-specific operand and the initial estimate are ready, allowing the FSM to enter the correct cube-root state.
+In all three branches, the cube-root estimate is initialized through exponent scaling rather than through a fixed numerical constant. The helper block \texttt{Divide\_int} approximates
+\begin{equation}
+E_{\sqrt[3]{S}} \approx 127 + \frac{E_S - 127}{3}
+\end{equation}
+so that the FSM can build the first cube-root estimate directly from the FP32 exponent field. The flag \texttt{READY\_BRANCH\_CHECK} is asserted when both the branch-specific operand and the corresponding initial estimate are ready, allowing the FSM to enter the correct cube-root state.
 
 \paragraph{7. \texttt{Cbrt\_COMPUTE\_R}}
 This state evaluates the real Pad\'e cube-root update
 \begin{equation}
 P_{n+1} = P_n \cdot \frac{P_n^3 + 2S}{2P_n^3 + S}
 \end{equation}
+The initial estimate $P_0$ used in this state is generated before entry by exponent scaling, not by iterative search. This means the real cube-root iteration starts from a value that already has approximately the correct order of magnitude.
+
 The controller schedules:
 \begin{itemize}
     \item $P_n^2$ and $P_n^3$,
@@ -207,7 +338,7 @@ To support this process, the controller uses a large subset of \texttt{r\_temp[]
     \item real and imaginary parts of $P^3$ and $P^4$,
     \item the numerator and denominator of the final complex quotient.
 \end{itemize}
-This state demonstrates the main architectural idea of the project: even complex-valued iterations are realized by scheduling a small number of shared scalar FP32 arithmetic blocks.
+The initial complex estimate is also generated by exponent logic. Instead of deriving separate analytical seeds for the real and imaginary parts, the hardware uses the larger exponent between both components as a conservative magnitude reference, then reconstructs FP32 seed values for \texttt{r\_cbrt\_re\_output} and \texttt{r\_cbrt\_im\_output}. This state demonstrates the main architectural idea of the project: even complex-valued iterations are realized by scheduling a small number of shared scalar FP32 arithmetic blocks.
 
 \paragraph{9. \texttt{CASE1\_COMPUTE}}
 This state generates three roots for the negative-discriminant branch. Since $C$ is complex, the solver combines \texttt{r\_C\_re}, \texttt{r\_C\_im}, and the constants $\varepsilon$ and $\varepsilon^2$ to produce
@@ -243,4 +374,4 @@ From an implementation point of view, the most important characteristic of this 
     \item \textbf{Pipeline outputs} are sampled later into \texttt{r\_temp[]} or dedicated registers once the expected arithmetic latency has elapsed.
 \end{itemize}
 
-This means that the solver behaves like a microprogrammed datapath: the FSM chooses the algorithmic branch, while \texttt{delay\_count} plays the role of a local instruction pointer that sequences operand issue and result capture. That organization is the key reason why a relatively small set of arithmetic modules can implement a much more complex cubic-equation solver.
+This means that the solver behaves like a microprogrammed datapath: the FSM chooses the algorithmic branch, while \texttt{delay\_count} plays the role of a local instruction pointer that sequences operand issue and result capture. The state-operation tables collected in the supplementary design notes show this clearly: in each state, different delay slots are assigned to specific \texttt{Mul\_FP}, \texttt{Add\_FP}, or \texttt{Div\_FP} transactions, and the resulting outputs are then written into \texttt{r\_temp[]} or into dedicated working registers such as \texttt{r\_delta}, \texttt{r\_sqrt\_output}, and \texttt{r\_C\_re}. That organization is the key reason why a relatively small set of arithmetic modules can implement a much more complex cubic-equation solver.
