@@ -2,7 +2,12 @@
 
 \subsection{Floating-point arithmetic subsystem}
 
-The arithmetic subsystem is the computational backbone of the solver. Instead of building a dedicated datapath for each algebraic expression, the design reuses three generic IEEE-754 single-precision modules: \texttt{Add\_FP}, \texttt{Mul\_FP}, and \texttt{Div\_FP}. This reuse reduces structural duplication and makes the overall architecture easier to verify because all high-level computations are expressed as scheduled combinations of the same operator set.
+The arithmetic subsystem is the computational backbone of the solver. The design philosophy is to build one reusable IEEE-754 FP32 arithmetic library, then let the top-level controller schedule these blocks repeatedly to evaluate the cubic-solving algorithm. In other words, the project follows a \textbf{shared datapath + control FSM} strategy instead of instantiating a separate arithmetic network for each formula. This approach has three advantages:
+\begin{itemize}[noitemsep]
+    \item it keeps the architecture structurally regular and easier to debug
+    \item it allows the same arithmetic blocks to be reused in coefficient normalization, discriminant computation, iterative approximation, and final root reconstruction
+    \item it makes the behavior of the hardware closely match the golden model, where each high-level formula is also decomposed into a sequence of primitive operations
+\end{itemize}
 
 \subsubsection{Adder module}
 The \texttt{Add\_FP} module performs both addition and subtraction on FP32 operands.
@@ -30,7 +35,7 @@ The \texttt{Div\_FP} module evaluates one FP32 division through a radix-4 pipeli
 
 \subsection{Main solver behavior}
 
-The \texttt{Cubic\_Solver} module is a controller-centric architecture. Its main responsibility is not to compute every formula in parallel, but to orchestrate the arithmetic modules so that the correct operands are presented to \texttt{Add\_FP}, \texttt{Mul\_FP}, and \texttt{Div\_FP} at the correct cycle offsets.
+The \texttt{Cubic\_Solver} module is a controller-centric architecture. Its main responsibility is not to compute every formula in parallel, but to orchestrate the arithmetic modules so that the correct operands are presented to \texttt{Add\_FP}, \texttt{Mul\_FP}, and \texttt{Div\_FP} at the correct cycle offsets. Each state of the FSM corresponds to one algorithmic phase, while \texttt{delay\_count} acts as a micro-scheduler that determines which arithmetic expression is being issued in that phase.
 
 Functionally, the top-level solver performs the following sequence:
 \begin{enumerate}
@@ -41,6 +46,15 @@ Functionally, the top-level solver performs the following sequence:
     \item Execute the cube-root iteration in either real or complex mode to obtain $C$.
     \item Combine $\hat{b}$, $C$, $\overline{C}$, and $\Delta_0/C$ to generate the three final roots.
 \end{enumerate}
+
+At the implementation level, this sequence is realized by repeatedly reconfiguring the inputs of the three arithmetic blocks:
+\begin{itemize}[noitemsep]
+    \item \texttt{MulInput1/2} carry products such as $\hat{b}^2$, $\hat{b}^3$, $\Delta_1^2$, $P^2$, $P^3$, and the real/imaginary cross-products used in complex cube-root iteration.
+    \item \texttt{AddInput1/2} combine intermediate terms into expressions such as $\Delta_0$, $\Delta_1$, $3S$, $3P^2+S$, $2P^3+S$, and the final root formulas.
+    \item \texttt{DivInput1/2} are used whenever the algorithm requires normalization by division, Pad\'e update evaluation, or the quotient $\Delta_0/C$.
+\end{itemize}
+
+This means the top-level block is best interpreted as a scheduled arithmetic engine rather than a static combinational solver.
 
 \subsection{Main control signals}
 
@@ -84,12 +98,28 @@ Besides the explicit control signals, the solver uses a compact set of internal 
     \item \texttt{r\_temp[0:63]}: scratchpad register bank used to preserve pipeline results across multiple delay slots in long arithmetic schedules.
 \end{itemize}
 
-\subsection{Functional role of branch control}
+\subsection{Functional role of branch control and initialization}
 
-The signal \texttt{case\_index} has a central functional meaning because it determines which numerical path the hardware will follow:
+The signal \texttt{case\_index} has a central functional meaning because it determines which numerical path the hardware will follow after the discriminant values have been computed:
 \begin{itemize}[noitemsep]
     \item \texttt{2'b01}: discriminant is negative, so the solver must compute a complex-valued cube root and later generate roots from $C$ and $\overline{C}$.
     \item \texttt{2'b10}: special real branch with simplified cube-root evaluation.
     \item \texttt{2'b11}: general real branch, where the solver computes both $C$ and $\Delta_0/C$ before forming the three roots.
 \end{itemize}
 Because all later states depend on this 2-bit decision, the \texttt{CASE\_CHECK} and \texttt{BRANCH\_CHECK} states serve as the bridge between the algebraic invariants and the branch-specific datapath schedule.
+
+Another important design feature is the use of \textbf{hardware-friendly initial estimates} for the iterative square-root and cube-root blocks.
+
+For the square-root stage, the initial approximation is formed directly from the exponent field of the operand. The wire
+\begin{equation}
+\texttt{sqrt\_output\_exp = ((exp(\Delta) + 127) >> 1)}
+\end{equation}
+approximates the exponent of $\sqrt{\Delta}$, and the corresponding mantissa is copied to create \texttt{sqrt\_output\_init}. This gives the Pad\'e square-root iteration a starting point that is already close in magnitude to the true solution.
+
+For the cube-root stage, the design uses the helper block \texttt{Divide\_int} to approximate the exponent transform
+\begin{equation}
+E_{\sqrt[3]{S}} \approx 127 + \frac{E_S - 127}{3}
+\end{equation}
+without invoking an additional floating-point divider. In the complex branch, the design first compares the exponents of the real and imaginary parts, selects the larger one as \texttt{exponent\_max}, and uses it to build a conservative initial estimate for the complex cube root. In the real branches, the exponent of the real operand alone is sufficient.
+
+This initialization strategy is important because it reduces the number of Pad\'e iterations needed for convergence and makes the iterative states more stable in hardware.

@@ -188,10 +188,10 @@
         \begin{tabular}{llr}
             
              Advisor:   \@advisor 
-            Student:  \@student 
+            Students:  \@student 
         \end{tabular}
         \vfill
-        Ho Chi Minh City, April 12, 2026
+        Ho Chi Minh City, June 12, 2026
     \end{center}
     \cleardoublepage
     \pagestyle{fancy}
