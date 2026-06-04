@@ -47,6 +47,12 @@ The temporal execution of the testbench is strictly split into two parallel driv
 
 The evaluation block accounts for rounding divergences caused by hardware normalization or mantissa truncation. Instead of demanding absolute bit-level equality, the checker applies a numerical tolerance window allowing a difference of up to 8 integer counts at the Least Significant Bit (LSB). The simulation successfully passed all 30 directed test vectors (\textbf{PASS 30/30}), verifying structural timing and math accuracy under zero-sum cancellation ($a + (-a) = 0$) and identity operations ($a + 0 = a$).
 
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\textwidth]{graphics/Add_FP_sim.jpg}
+\caption{Simulation waveform of \texttt{tb\_Add\_FP.v} showing pipelined floating-point addition operations}
+\end{figure}
+
 \subsection{Mul\_FP Testbench}
 
 The hardware multiplier is verified via \texttt{tb\_Mul\_FP.v}. While structurally similar to the adder testbench, this block evaluates the throughput capacity of a 7-stage pipelined multiplier utilizing a dense burst-mode stimulus pattern. The arrays \texttt{input\_a}, \texttt{input\_b}, and \texttt{expected} hold 20 unique test vectors. Operators are injected into the ports \texttt{FP\_in1} and \texttt{FP\_in2} continuously on every consecutive clock cycle without inserting wait states for intermediate calculation cycles.
@@ -54,6 +60,12 @@ The hardware multiplier is verified via \texttt{tb\_Mul\_FP.v}. While structural
 The driver process triggers input delivery after a short stabilization period. Because a standard floating-point multiplier can scale exponents and shift mantissas during normalization, bit transitions at the boundary fields require strict tracking. The monitor process stalls for exactly 7 pipeline clock cycles before sampling \texttt{FP\_out}. The comparison logic employs a rigorous verification window: it accepts an absolute bitwise match or a narrow tolerance of $\le 1$ LSB count to safely absorb rounding discrepancies introduced during post-multiplication normalization. 
 
 The test cases cover zero-factor multiplication, alternating sign bits, maximum exponent growth, and large-magnitude operands. The design achieved flawless verification results (\textbf{PASS 20/20}), confirming stable multi-stage register pipelines and proper handling of signed-zero products ($0 \times -a = -0$).
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\textwidth]{graphics/Mul_FP_sim.jpg}
+\caption{Simulation waveform of \texttt{tb\_Mul\_FP.v} showing pipelined floating-point multiplication operations}
+\end{figure}
 
 \subsection{Div\_FP Testbench}
 
